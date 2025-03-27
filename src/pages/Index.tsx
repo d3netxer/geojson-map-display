@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Info } from 'lucide-react';
 
 const Index = () => {
-  const [apiKey, setApiKey] = useState<string>('');
+  const [apiKey, setApiKey] = useState<string>('pk.eyJ1IjoidGdlcnRpbiIsImEiOiJYTW5sTVhRIn0.X4B5APkxkWVaiSg3KqMCaQ');
   const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
   const [mapReady, setMapReady] = useState<boolean>(true);
 
@@ -36,7 +36,7 @@ const Index = () => {
       </Button>
       
       {/* Map Component */}
-      {mapReady && <MapboxMap apiKey={apiKey || undefined} />}
+      {mapReady && <MapboxMap apiKey={apiKey} />}
       
       {/* API Key Dialog */}
       <Dialog open={showApiKeyModal} onOpenChange={setShowApiKeyModal}>
@@ -51,7 +51,7 @@ const Index = () => {
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <label htmlFor="apiKey" className="text-sm font-medium">
-                Mapbox API Key (optional)
+                Mapbox API Key
               </label>
               <Input
                 id="apiKey"
@@ -60,7 +60,7 @@ const Index = () => {
                 onChange={(e) => setApiKey(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                Leave blank to use the default key. Get your own key at mapbox.com.
+                If you want to use a different Mapbox API key, enter it here and click Apply Changes.
               </p>
             </div>
             

@@ -37,14 +37,16 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey }) => {
   const [mapStyle, setMapStyle] = useState<string>('mapbox://styles/mapbox/light-v11');
   const [fullscreen, setFullscreen] = useState<boolean>(false);
   
-  // Use a fallback key if none provided
-  const token = apiKey || 'pk.eyJ1IjoibG92YWJsZS1haSIsImEiOiJjbHluMnZxdm0wZmdiMnFueGczZmdlYXBhIn0.a-hQZCN9R2WO2td8IZxJ9A';
+  // Use the provided api key, with your key as the fallback
+  const token = apiKey || 'pk.eyJ1IjoidGdlcnRpbiIsImEiOiJYTW5sTVhRIn0.X4B5APkxkWVaiSg3KqMCaQ';
 
   useEffect(() => {
     if (!mapContainer.current) return;
     
     // Set mapbox token
     mapboxgl.accessToken = token;
+    
+    console.log("Initializing map with token:", token);
     
     // Process GeoJSON data
     const { processedGeoJSON, metricStats } = processGeoJSON(riyadhGeoJSON, metric);
@@ -79,7 +81,7 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey }) => {
     
     // Loading events
     mapInstance.on('load', () => {
-      console.log('Map loaded');
+      console.log('Map loaded successfully');
       
       // Add the GeoJSON source
       mapInstance.addSource('riyadh-hexagons', {
@@ -87,7 +89,7 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey }) => {
         data: processedGeoJSON,
       });
       
-      console.log('Adding hexagon layers');
+      console.log('Adding hexagon layers with features count:', processedGeoJSON.features.length);
       
       // Convert MultiPolygon to Polygon for better rendering
       const features = processedGeoJSON.features.map((feature: any) => {
@@ -106,6 +108,8 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey }) => {
         type: 'FeatureCollection',
         features: features
       });
+      
+      console.log('Converted features for rendering:', features.length);
       
       // Add 3D hexagon layer
       mapInstance.addLayer({
@@ -127,8 +131,8 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey }) => {
             'interpolate',
             ['linear'],
             ['get', metric],
-            metricStats.min, 100,  // Minimum height to ensure visibility
-            metricStats.max, 1000  // Increased maximum height for better visualization
+            metricStats.min, 500,  // Increased minimum height for better visibility
+            metricStats.max, 2000  // Increased maximum height for better visualization
           ],
           'fill-extrusion-base': 0,
           'fill-extrusion-opacity': 0.8,
@@ -186,7 +190,7 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey }) => {
     // Handle errors
     mapInstance.on('error', (e) => {
       console.error('Mapbox error:', e);
-      toast.error('Error loading map. Please check your Mapbox API key or try again later.');
+      toast.error('Error loading map: ' + (e.error?.message || 'Unknown error'));
       setLoading(false);
     });
     
@@ -224,8 +228,8 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey }) => {
         'interpolate',
         ['linear'],
         ['get', metric],
-        metricStats.min, 100,
-        metricStats.max, 1000
+        metricStats.min, 500,
+        metricStats.max, 2000
       ]);
       
       toast.success(`Visualizing: ${getMetricLabel(metric)}`);
