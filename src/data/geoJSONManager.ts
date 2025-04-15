@@ -2,9 +2,9 @@
 import defaultGeoJSON from './defaultGeoJSON';
 import customGeoJSON from './customGeoJSON';
 
-// This is the environment variable check
+// This is the environment variable check using Vite's import.meta.env
 // Set this to 'custom' in your development environment to use the custom GeoJSON
-const GEOJSON_SOURCE = process.env.REACT_APP_GEOJSON_SOURCE || 'default';
+const GEOJSON_SOURCE = import.meta.env.VITE_GEOJSON_SOURCE || 'default';
 
 // Object containing all available datasets
 const datasets = {

@@ -16,14 +16,14 @@ const Index = () => {
   const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
   const [mapReady, setMapReady] = useState<boolean>(true);
   const [currentGeoJSON, setCurrentGeoJSON] = useState<any>(activeGeoJSON);
-  const [datasetSource, setDatasetSource] = useState<string>(process.env.REACT_APP_GEOJSON_SOURCE || 'default');
+  const [datasetSource, setDatasetSource] = useState<string>(import.meta.env.VITE_GEOJSON_SOURCE || 'default');
 
   // When component mounts, check which dataset is active
   useEffect(() => {
-    const currentDataset = process.env.REACT_APP_GEOJSON_SOURCE || 'default';
+    const currentDataset = import.meta.env.VITE_GEOJSON_SOURCE || 'default';
     setDatasetSource(currentDataset);
     
-    toast.info(`Using ${currentDataset} GeoJSON dataset in WGS84 format. To switch, set REACT_APP_GEOJSON_SOURCE environment variable.`);
+    toast.info(`Using ${currentDataset} GeoJSON dataset in WGS84 format. To switch, set VITE_GEOJSON_SOURCE environment variable.`);
   }, []);
 
   const handleApiKeySubmit = () => {
