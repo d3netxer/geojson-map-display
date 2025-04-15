@@ -55,8 +55,8 @@ export function getColorScale(min: number, max: number, metric?: string) {
     // Cool blue scale (good for speed)
     blue: ['#cfe2f3', '#9fc5e8', '#6fa8dc', '#3d85c6', '#0b5394'],
     
-    // Green to red scale (good for congestion - green is low congestion, red is high)
-    congestion: ['#F2FCE2', '#A4D86E', '#FFD166', '#F17A3A', '#EA384C'],
+    // Red to green scale (good for congestion - red is high congestion/low value, green is low congestion/high value)
+    congestion: ['#EA384C', '#F17A3A', '#FFD166', '#A4D86E', '#F2FCE2'],
     
     // Green scale (good for green metrics)
     green: ['#d9ead3', '#b6d7a8', '#93c47d', '#6aa84f', '#38761d'],
