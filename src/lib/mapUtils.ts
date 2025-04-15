@@ -55,8 +55,8 @@ export function getColorScale(min: number, max: number, metric?: string) {
     // Cool blue scale (good for speed)
     blue: ['#cfe2f3', '#9fc5e8', '#6fa8dc', '#3d85c6', '#0b5394'],
     
-    // Red to green scale (good for congestion - red is low value/high congestion, green is high value/low congestion)
-    congestion: ['#EA384C', '#F17A3A', '#FFD166', '#A4D86E', '#F2FCE2'],
+    // Green to red scale (good for congestion - red is high congestion, green is low congestion)
+    congestion: ['#F2FCE2', '#A4D86E', '#FFD166', '#F17A3A', '#EA384C'],
     
     // Green scale (good for green metrics)
     green: ['#d9ead3', '#b6d7a8', '#93c47d', '#6aa84f', '#38761d'],
@@ -101,15 +101,14 @@ export function formatValue(value: number, metric: string): string {
 
 /**
  * Get height multiplier based on metric type - useful for 3D visualization
- * For congestion, lower values should be taller
+ * For congestion, higher values should be taller
  */
 export function getHeightMultiplier(value: number, min: number, max: number, metric?: string): number {
-  // For congestion, we want to invert the height (lower values = taller hexagons)
+  // For congestion, higher values = taller hexagons
   if (metric && metric.includes('conge')) {
-    // Normalize and invert: (max - value) / range will be higher for lower values
     const range = max - min;
     if (range === 0) return 1;
-    return 1 + ((max - value) / range) * 2; // Scale factor of 2 to make the difference more noticeable
+    return 1 + ((value - min) / range) * 2; // Scale factor of 2 to make the difference more noticeable
   }
   
   // For other metrics, higher values get taller

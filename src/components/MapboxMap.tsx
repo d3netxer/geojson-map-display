@@ -131,8 +131,8 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
               'interpolate',
               ['linear'],
               ['get', metric],
-              stats.min, metric.includes('conge') ? 2000 : 500, // Higher base for low congestion
-              stats.max, metric.includes('conge') ? 500 : 2000   // Lower heights for high congestion
+              stats.min, metric.includes('conge') ? 500 : 500, // Base height for all metrics
+              stats.max, metric.includes('conge') ? 2000 : 2000 // Higher heights for high congestion
             ],
             'fill-extrusion-base': 0,
             'fill-extrusion-opacity': 0.8,
@@ -220,8 +220,8 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
         'interpolate',
         ['linear'],
         ['get', metric],
-        stats.min, metric.includes('conge') ? 2000 : 500, // Higher base for low congestion
-        stats.max, metric.includes('conge') ? 500 : 2000  // Lower heights for high congestion
+        stats.min, metric.includes('conge') ? 500 : 500, // Base height for all metrics
+        stats.max, metric.includes('conge') ? 2000 : 2000 // Higher heights for high congestion
       ]);
       
       toast.success(`Visualizing: ${getMetricLabel(metric)}`);
