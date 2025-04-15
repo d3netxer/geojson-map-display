@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { ArrowDown, Layers, Maximize2, BarChart3, Info } from 'lucide-react';
@@ -37,170 +36,179 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey }) => {
   const [mapStyle, setMapStyle] = useState<string>('mapbox://styles/mapbox/light-v11');
   const [fullscreen, setFullscreen] = useState<boolean>(false);
   
-  // Use the provided api key, with your key as the fallback
+  // Validate Mapbox token
+  const validateMapboxToken = (token: string) => {
+    const tokenParts = token.split('.');
+    if (tokenParts.length !== 3) {
+      toast.error('Invalid Mapbox token format');
+      return false;
+    }
+    return true;
+  };
+
+  // Use the provided api key, with fallback
   const token = apiKey || 'pk.eyJ1IjoidGdlcnRpbiIsImEiOiJYTW5sTVhRIn0.X4B5APkxkWVaiSg3KqMCaQ';
 
   useEffect(() => {
     if (!mapContainer.current) return;
+    
+    // Validate token before initializing
+    if (!validateMapboxToken(token)) {
+      toast.error('Please provide a valid Mapbox access token');
+      setLoading(false);
+      return;
+    }
     
     // Set mapbox token
     mapboxgl.accessToken = token;
     
     console.log("Initializing map with token:", token);
     
-    // Process GeoJSON data
-    const { processedGeoJSON, metricStats } = processGeoJSON(riyadhGeoJSON, metric);
-    const colorScale = getColorScale(metricStats.min, metricStats.max);
-    
-    // Initialize map
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: mapStyle,
-      center: [46.75, 24.68], // Center on Riyadh
-      zoom: 12,
-      minZoom: 10,
-      maxZoom: 16,
-      attributionControl: false,
-      pitch: 45, // Add a slight tilt for a 3D effect
-    });
-    
-    const mapInstance = map.current;
-    
-    // Add navigation controls
-    mapInstance.addControl(
-      new mapboxgl.NavigationControl({
-        visualizePitch: true,
-      }),
-      'bottom-right'
-    );
-    
-    // Add attribution control in a more minimalist position
-    mapInstance.addControl(new mapboxgl.AttributionControl({
-      compact: true
-    }), 'bottom-left');
-    
-    // Loading events
-    mapInstance.on('load', () => {
-      console.log('Map loaded successfully');
+    try {
+      // Process GeoJSON data
+      const { processedGeoJSON, metricStats } = processGeoJSON(riyadhGeoJSON, metric);
+      const colorScale = getColorScale(metricStats.min, metricStats.max);
       
-      // Add the GeoJSON source
-      mapInstance.addSource('riyadh-hexagons', {
-        type: 'geojson',
-        data: processedGeoJSON,
+      // Initialize map
+      map.current = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: mapStyle,
+        center: [46.75, 24.68], // Center on Riyadh
+        zoom: 12,
+        minZoom: 10,
+        maxZoom: 16,
+        attributionControl: false,
+        pitch: 45, // Add a slight tilt for a 3D effect
       });
       
-      console.log('Adding hexagon layers with features count:', processedGeoJSON.features.length);
+      const mapInstance = map.current;
       
-      // Convert MultiPolygon to Polygon for better rendering
-      const features = processedGeoJSON.features.map((feature: any) => {
-        const newFeature = { ...feature };
-        if (feature.geometry.type === 'MultiPolygon') {
-          newFeature.geometry = {
-            type: 'Polygon',
-            coordinates: feature.geometry.coordinates[0]
-          };
-        }
-        return newFeature;
-      });
+      // Add navigation controls
+      mapInstance.addControl(
+        new mapboxgl.NavigationControl({
+          visualizePitch: true,
+        }),
+        'bottom-right'
+      );
       
-      // Update the source with converted features
-      mapInstance.getSource('riyadh-hexagons').setData({
-        type: 'FeatureCollection',
-        features: features
-      });
+      // Add attribution control in a more minimalist position
+      mapInstance.addControl(new mapboxgl.AttributionControl({
+        compact: true
+      }), 'bottom-left');
       
-      console.log('Converted features for rendering:', features.length);
-      
-      // Add 3D hexagon layer
-      mapInstance.addLayer({
-        id: 'hexagons-fill',
-        type: 'fill-extrusion',
-        source: 'riyadh-hexagons',
-        paint: {
-          'fill-extrusion-color': [
-            'interpolate',
-            ['linear'],
-            ['get', metric],
-            metricStats.min, colorScale[0],
-            metricStats.min + (metricStats.range * 0.25), colorScale[1],
-            metricStats.min + (metricStats.range * 0.5), colorScale[2],
-            metricStats.min + (metricStats.range * 0.75), colorScale[3],
-            metricStats.max, colorScale[4],
-          ],
-          'fill-extrusion-height': [
-            'interpolate',
-            ['linear'],
-            ['get', metric],
-            metricStats.min, 500,  // Increased minimum height for better visibility
-            metricStats.max, 2000  // Increased maximum height for better visualization
-          ],
-          'fill-extrusion-base': 0,
-          'fill-extrusion-opacity': 0.8,
-        }
-      });
-      
-      // Add outline layer
-      mapInstance.addLayer({
-        id: 'hexagons-outline',
-        type: 'line',
-        source: 'riyadh-hexagons',
-        paint: {
-          'line-color': 'rgba(255, 255, 255, 0.5)',
-          'line-width': 1,
-        }
-      });
-      
-      // Click event to get hexagon info
-      mapInstance.on('click', 'hexagons-fill', (e) => {
-        if (!e.features || e.features.length === 0) return;
+      // Loading events
+      mapInstance.on('load', () => {
+        console.log('Map loaded successfully');
         
-        const feature = e.features[0];
-        setSelectedFeature(feature);
-        
-        // Create popup at click point
-        const coordinates = e.lngLat;
-        
-        // Fly to the clicked hexagon
-        mapInstance.flyTo({
-          center: coordinates,
-          zoom: Math.max(mapInstance.getZoom(), 13.5),
-          duration: 1000,
-          essential: true
+        // Add the GeoJSON source
+        mapInstance.addSource('riyadh-hexagons', {
+          type: 'geojson',
+          data: processedGeoJSON,
         });
         
-        toast.success(`Selected Grid ${feature.properties.GRID_ID}`);
+        console.log('Adding hexagon layers with features count:', processedGeoJSON.features.length);
+        
+        // Convert MultiPolygon to Polygon for better rendering
+        const features = processedGeoJSON.features.map((feature: any) => {
+          const newFeature = { ...feature };
+          if (feature.geometry.type === 'MultiPolygon') {
+            newFeature.geometry = {
+              type: 'Polygon',
+              coordinates: feature.geometry.coordinates[0]
+            };
+          }
+          return newFeature;
+        });
+        
+        // Update the source with converted features
+        mapInstance.getSource('riyadh-hexagons').setData({
+          type: 'FeatureCollection',
+          features: features
+        });
+        
+        console.log('Converted features for rendering:', features.length);
+        
+        // Add 3D hexagon layer
+        mapInstance.addLayer({
+          id: 'hexagons-fill',
+          type: 'fill-extrusion',
+          source: 'riyadh-hexagons',
+          paint: {
+            'fill-extrusion-color': [
+              'interpolate',
+              ['linear'],
+              ['get', metric],
+              metricStats.min, colorScale[0],
+              metricStats.min + (metricStats.range * 0.25), colorScale[1],
+              metricStats.min + (metricStats.range * 0.5), colorScale[2],
+              metricStats.min + (metricStats.range * 0.75), colorScale[3],
+              metricStats.max, colorScale[4],
+            ],
+            'fill-extrusion-height': [
+              'interpolate',
+              ['linear'],
+              ['get', metric],
+              metricStats.min, 500,  // Increased minimum height for better visibility
+              metricStats.max, 2000  // Increased maximum height for better visualization
+            ],
+            'fill-extrusion-base': 0,
+            'fill-extrusion-opacity': 0.8,
+          }
+        });
+        
+        // Add outline layer
+        mapInstance.addLayer({
+          id: 'hexagons-outline',
+          type: 'line',
+          source: 'riyadh-hexagons',
+          paint: {
+            'line-color': 'rgba(255, 255, 255, 0.5)',
+            'line-width': 1,
+          }
+        });
+        
+        // Click event to get hexagon info
+        mapInstance.on('click', 'hexagons-fill', (e) => {
+          if (!e.features || e.features.length === 0) return;
+          
+          const feature = e.features[0];
+          setSelectedFeature(feature);
+          
+          // Create popup at click point
+          const coordinates = e.lngLat;
+          
+          // Fly to the clicked hexagon
+          mapInstance.flyTo({
+            center: coordinates,
+            zoom: Math.max(mapInstance.getZoom(), 13.5),
+            duration: 1000,
+            essential: true
+          });
+          
+          toast.success(`Selected Grid ${feature.properties.GRID_ID}`);
+        });
+        
+        // Change cursor on hover
+        mapInstance.on('mouseenter', 'hexagons-fill', () => {
+          mapInstance.getCanvas().style.cursor = 'pointer';
+        });
+        
+        mapInstance.on('mouseleave', 'hexagons-fill', () => {
+          mapInstance.getCanvas().style.cursor = '';
+        });
+        
+        // Hide loading indicator
+        setLoading(false);
+        
+        // Show success toast when map is loaded
+        toast.success("Map data loaded successfully!");
       });
       
-      // Change cursor on hover
-      mapInstance.on('mouseenter', 'hexagons-fill', () => {
-        mapInstance.getCanvas().style.cursor = 'pointer';
-      });
-      
-      mapInstance.on('mouseleave', 'hexagons-fill', () => {
-        mapInstance.getCanvas().style.cursor = '';
-      });
-      
-      // Hide loading indicator
+    } catch (error) {
+      console.error('Map initialization error:', error);
+      toast.error('Failed to initialize map. Check your Mapbox token and network connection.');
       setLoading(false);
-      
-      // Show success toast when map is loaded
-      toast.success("Map data loaded successfully!");
-    });
-    
-    // Handle errors
-    mapInstance.on('error', (e) => {
-      console.error('Mapbox error:', e);
-      toast.error('Error loading map: ' + (e.error?.message || 'Unknown error'));
-      setLoading(false);
-    });
-    
-    // Cleanup
-    return () => {
-      if (map.current) {
-        map.current.remove();
-        map.current = null;
-      }
-    };
+    }
   }, [token, mapStyle, metric]);
   
   // Update the metric when it changes
