@@ -31,14 +31,26 @@ export function processGeoJSON(geojson: any, metric: string = 'mean_speed') {
   if (metric.includes('conge')) {
     // Sort values for quantile calculation
     const sortedValues = [...metricValues].sort((a, b) => a - b);
+    
+    // Ensure we have unique, ascending values for the quantiles
+    // This is critical for Mapbox's step expression which requires strictly ascending values
+    const length = sortedValues.length;
     quantiles = [
       min,
-      sortedValues[Math.floor(sortedValues.length * 0.2)],
-      sortedValues[Math.floor(sortedValues.length * 0.4)],
-      sortedValues[Math.floor(sortedValues.length * 0.6)],
-      sortedValues[Math.floor(sortedValues.length * 0.8)],
+      sortedValues[Math.floor(length * 0.2)],
+      sortedValues[Math.floor(length * 0.4)],
+      sortedValues[Math.floor(length * 0.6)],
+      sortedValues[Math.floor(length * 0.8)],
       max
     ];
+    
+    // Ensure strictly ascending order by adjusting any identical values
+    for (let i = 1; i < quantiles.length; i++) {
+      if (quantiles[i] <= quantiles[i-1]) {
+        // Add a small epsilon to make it strictly greater than the previous value
+        quantiles[i] = quantiles[i-1] + 0.000001;
+      }
+    }
     
     console.log('Quantiles for congestion:', quantiles);
   }
@@ -135,4 +147,3 @@ export function getHeightMultiplier(value: number, min: number, max: number, met
   if (range === 0) return 1;
   return 1 + ((value - min) / range);
 }
-

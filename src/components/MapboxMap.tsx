@@ -116,6 +116,7 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
         
         if (metric.includes('conge') && stats.quantiles) {
           // Use quantiles for congestion metrics
+          // Ensure the values are strictly ascending
           colorExpression = [
             'step',
             ['get', metric],
