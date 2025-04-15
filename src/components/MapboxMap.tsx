@@ -113,6 +113,7 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
         
         // Configure fill-extrusion-color based on metric
         let colorExpression;
+        let heightExpression;
         
         if (metric.includes('conge') && stats.quantiles) {
           // Use quantiles for congestion metrics
@@ -126,6 +127,18 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
             stats.quantiles[3], colors[3],
             stats.quantiles[4], colors[4]
           ];
+          
+          // Also use quantiles for height expression when showing congestion
+          heightExpression = [
+            'step',
+            ['get', metric],
+            500, // Base height
+            stats.quantiles[1], 800,
+            stats.quantiles[2], 1200,
+            stats.quantiles[3], 1600,
+            stats.quantiles[4], 2000
+          ];
+          
           console.log('Using quantile classification for congestion with breaks:', stats.quantiles);
         } else {
           // Use linear interpolation for other metrics
@@ -139,6 +152,15 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
             stats.min + (stats.range * 0.75), colors[3],
             stats.max, colors[4],
           ];
+          
+          // Regular linear interpolation for height with other metrics
+          heightExpression = [
+            'interpolate',
+            ['linear'],
+            ['get', metric],
+            stats.min, 500, // Base height for all metrics
+            stats.max, 2000 // Higher heights for high values
+          ];
         }
         
         mapInstance.addLayer({
@@ -147,13 +169,7 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
           source: 'riyadh-hexagons',
           paint: {
             'fill-extrusion-color': colorExpression,
-            'fill-extrusion-height': [
-              'interpolate',
-              ['linear'],
-              ['get', metric],
-              stats.min, metric.includes('conge') ? 500 : 500, // Base height for all metrics
-              stats.max, metric.includes('conge') ? 2000 : 2000 // Higher heights for high congestion
-            ],
+            'fill-extrusion-height': heightExpression,
             'fill-extrusion-base': 0,
             'fill-extrusion-opacity': 0.8,
           }
@@ -227,6 +243,7 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
       
       // Configure color expression based on metric type
       let colorExpression;
+      let heightExpression;
       
       if (metric.includes('conge') && stats.quantiles) {
         // Use quantiles for congestion metrics
@@ -239,6 +256,18 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
           stats.quantiles[3], colors[3],
           stats.quantiles[4], colors[4]
         ];
+        
+        // Also use quantiles for height expression when showing congestion
+        heightExpression = [
+          'step',
+          ['get', metric],
+          500, // Base height
+          stats.quantiles[1], 800,
+          stats.quantiles[2], 1200,
+          stats.quantiles[3], 1600,
+          stats.quantiles[4], 2000
+        ];
+        
         console.log('Using quantile classification for congestion with breaks:', stats.quantiles);
       } else {
         // Use linear interpolation for other metrics
@@ -252,17 +281,19 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
           stats.min + (stats.range * 0.75), colors[3],
           stats.max, colors[4],
         ];
+        
+        // Regular linear interpolation for height with other metrics
+        heightExpression = [
+          'interpolate',
+          ['linear'],
+          ['get', metric],
+          stats.min, 500, // Base height for all metrics
+          stats.max, 2000 // Higher heights for high values
+        ];
       }
       
       map.current.setPaintProperty('hexagons-fill', 'fill-extrusion-color', colorExpression);
-      
-      map.current.setPaintProperty('hexagons-fill', 'fill-extrusion-height', [
-        'interpolate',
-        ['linear'],
-        ['get', metric],
-        stats.min, metric.includes('conge') ? 500 : 500, // Base height for all metrics
-        stats.max, metric.includes('conge') ? 2000 : 2000 // Higher heights for high congestion
-      ]);
+      map.current.setPaintProperty('hexagons-fill', 'fill-extrusion-height', heightExpression);
       
       toast.success(`Visualizing: ${getMetricLabel(metric)}`);
     } catch (error) {

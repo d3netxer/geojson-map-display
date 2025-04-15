@@ -51,7 +51,7 @@ const MapLegend: React.FC<MapLegendProps> = ({ title, min, max, colorScale, metr
       </div>
       {metric.includes('conge') && (
         <div className="text-xs text-muted-foreground mt-2">
-          Using quantile classification
+          Using quantile classification for color and elevation
         </div>
       )}
     </div>
