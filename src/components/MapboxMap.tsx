@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { ArrowDown, Layers, Maximize2, BarChart3, Info } from 'lucide-react';
@@ -5,7 +6,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
-import { processGeoJSON, getColorScale, formatValue } from '@/lib/mapUtils';
+import { processGeoJSON, getColorScale, formatValue, getHeightMultiplier } from '@/lib/mapUtils';
 import MapLegend from './MapLegend';
 import GeoJSONFileSelector from './GeoJSONFileSelector';
 
@@ -130,8 +131,8 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
               'interpolate',
               ['linear'],
               ['get', metric],
-              stats.min, 500,
-              stats.max, 2000
+              stats.min, metric.includes('conge') ? 2000 : 500, // Higher base for low congestion
+              stats.max, metric.includes('conge') ? 500 : 2000   // Lower heights for high congestion
             ],
             'fill-extrusion-base': 0,
             'fill-extrusion-opacity': 0.8,
@@ -219,8 +220,8 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
         'interpolate',
         ['linear'],
         ['get', metric],
-        stats.min, 500,
-        stats.max, 2000
+        stats.min, metric.includes('conge') ? 2000 : 500, // Higher base for low congestion
+        stats.max, metric.includes('conge') ? 500 : 2000  // Lower heights for high congestion
       ]);
       
       toast.success(`Visualizing: ${getMetricLabel(metric)}`);
