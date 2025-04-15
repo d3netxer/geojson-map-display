@@ -55,8 +55,8 @@ export function getColorScale(min: number, max: number, metric?: string) {
     // Cool blue scale (good for speed)
     blue: ['#cfe2f3', '#9fc5e8', '#6fa8dc', '#3d85c6', '#0b5394'],
     
-    // Red scale (good for congestion)
-    red: ['#f4cccc', '#ea9999', '#e06666', '#cc0000', '#990000'],
+    // Green to red scale (good for congestion - green is low congestion, red is high)
+    congestion: ['#F2FCE2', '#A4D86E', '#FFD166', '#F17A3A', '#EA384C'],
     
     // Green scale (good for green metrics)
     green: ['#d9ead3', '#b6d7a8', '#93c47d', '#6aa84f', '#38761d'],
@@ -68,7 +68,7 @@ export function getColorScale(min: number, max: number, metric?: string) {
   // Select color scale based on metric name if provided
   if (metric) {
     if (metric.includes('conge')) {
-      return colorScales.red;
+      return colorScales.congestion;
     } else if (metric.includes('urban_')) {
       return colorScales.purple;
     } else if (metric.includes('vktkm')) {
