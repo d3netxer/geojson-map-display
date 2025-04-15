@@ -1,20 +1,30 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Toaster } from "sonner";
+import { toast } from "sonner";
 import MapboxMap from '../components/MapboxMap';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Info } from 'lucide-react';
 
-// Import the GeoJSON manager instead of directly importing defaultGeoJSON
-import activeGeoJSON, { getActiveGeoJSON } from '../data/geoJSONManager';
+// Import the GeoJSON manager
+import activeGeoJSON, { getActiveGeoJSON, geoJSONDatasets } from '../data/geoJSONManager';
 
 const Index = () => {
   const [apiKey, setApiKey] = useState<string>('pk.eyJ1IjoidGdlcnRpbiIsImEiOiJYTW5sTVhRIn0.X4B5APkxkWVaiSg3KqMCaQ');
   const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
   const [mapReady, setMapReady] = useState<boolean>(true);
   const [currentGeoJSON, setCurrentGeoJSON] = useState<any>(activeGeoJSON);
+  const [datasetSource, setDatasetSource] = useState<string>(process.env.REACT_APP_GEOJSON_SOURCE || 'default');
+
+  // When component mounts, check which dataset is active
+  useEffect(() => {
+    const currentDataset = process.env.REACT_APP_GEOJSON_SOURCE || 'default';
+    setDatasetSource(currentDataset);
+    
+    toast.info(`Using ${currentDataset} GeoJSON dataset. To switch, set REACT_APP_GEOJSON_SOURCE environment variable.`);
+  }, []);
 
   const handleApiKeySubmit = () => {
     setMapReady(false);
@@ -34,6 +44,19 @@ const Index = () => {
     }, 100);
   };
 
+  // Switch between available datasets
+  const toggleDataset = () => {
+    const newDataset = datasetSource === 'default' ? 'custom' : 'default';
+    setMapReady(false);
+    
+    setTimeout(() => {
+      setDatasetSource(newDataset);
+      setCurrentGeoJSON(geoJSONDatasets[newDataset as keyof typeof geoJSONDatasets]);
+      setMapReady(true);
+      toast.success(`Switched to ${newDataset} dataset (${geoJSONDatasets[newDataset as keyof typeof geoJSONDatasets].features.length} features)`);
+    }, 100);
+  };
+
   return (
     <div className="relative min-h-screen bg-background antialiased">
       <Toaster position="top-right" richColors />
@@ -46,6 +69,16 @@ const Index = () => {
         onClick={() => setShowApiKeyModal(true)}
       >
         <Info size={20} />
+      </Button>
+      
+      {/* Dataset Toggle Button */}
+      <Button 
+        variant="secondary"
+        size="sm"
+        className="absolute top-4 left-4 z-50 bg-white/80 backdrop-blur-sm hover:bg-white/90"
+        onClick={toggleDataset}
+      >
+        {datasetSource === 'default' ? 'Switch to Custom Dataset' : 'Switch to Default Dataset'}
       </Button>
       
       {/* Map Component */}
@@ -75,6 +108,18 @@ const Index = () => {
               <p className="text-xs text-muted-foreground">
                 If you want to use a different Mapbox API key, enter it here and click Apply Changes.
               </p>
+            </div>
+            
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">
+                GeoJSON Dataset
+              </label>
+              <div className="bg-muted p-2 rounded-md text-sm">
+                <p>Current: <span className="font-semibold">{datasetSource}</span> ({currentGeoJSON.features.length} features)</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  To switch datasets in development, set the <code>REACT_APP_GEOJSON_SOURCE</code> environment variable to 'default' or 'custom'.
+                </p>
+              </div>
             </div>
             
             <div className="flex justify-end">
