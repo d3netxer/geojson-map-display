@@ -1,21 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
-import { ArrowDown, Layers, Maximize2, BarChart3, Info } from 'lucide-react';
+import { ArrowDown, Layers, Maximize2, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
 import { processGeoJSON, getColorScale, formatValue, getHeightMultiplier } from '@/lib/mapUtils';
 import MapLegend from './MapLegend';
-import GeoJSONFileSelector from './GeoJSONFileSelector';
 
 interface MapboxMapProps {
   apiKey?: string;
   geoJSONData: any;
-  onGeoJSONChange: (newGeoJSON: any) => void;
 }
 
-const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONChange }) => {
+const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [loading, setLoading] = useState(true);
@@ -316,10 +314,6 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
     }
   }, [fullscreen]);
   
-  const handleMetricChange = (newMetric: string) => {
-    setMetric(newMetric);
-  };
-  
   const getMetricLabel = (metricKey: string): string => {
     const labels: Record<string, string> = {
       'mean_speed': 'Average Speed (km/h)',
@@ -400,11 +394,6 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
           <Layers size={16} />
           <span>Change Style</span>
         </Button>
-        
-        <GeoJSONFileSelector
-          onFileLoaded={onGeoJSONChange}
-          defaultGeoJSON={geoJSONData}
-        />
         
         <Popover>
           <PopoverTrigger asChild>

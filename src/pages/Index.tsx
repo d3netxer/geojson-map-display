@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Toaster } from "sonner";
 import { toast } from "sonner";
@@ -32,15 +31,6 @@ const Index = () => {
     setTimeout(() => {
       setMapReady(true);
       setShowApiKeyModal(false);
-    }, 100);
-  };
-
-  const handleGeoJSONChange = (newGeoJSON: any) => {
-    setMapReady(false);
-    // Brief timeout to allow the map to re-initialize with the new GeoJSON
-    setTimeout(() => {
-      setCurrentGeoJSON(newGeoJSON);
-      setMapReady(true);
     }, 100);
   };
 
@@ -82,7 +72,7 @@ const Index = () => {
       </Button>
       
       {/* Map Component */}
-      {mapReady && <MapboxMap apiKey={apiKey} geoJSONData={currentGeoJSON} onGeoJSONChange={handleGeoJSONChange} />}
+      {mapReady && <MapboxMap apiKey={apiKey} geoJSONData={currentGeoJSON} />}
       
       {/* API Key Dialog */}
       <Dialog open={showApiKeyModal} onOpenChange={setShowApiKeyModal}>
