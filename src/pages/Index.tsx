@@ -7,14 +7,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Input } from '@/components/ui/input';
 import { Info } from 'lucide-react';
 
-// Import the default GeoJSON data
-import defaultGeoJSON from '../data/defaultGeoJSON';
+// Import the GeoJSON manager instead of directly importing defaultGeoJSON
+import activeGeoJSON, { getActiveGeoJSON } from '../data/geoJSONManager';
 
 const Index = () => {
   const [apiKey, setApiKey] = useState<string>('pk.eyJ1IjoidGdlcnRpbiIsImEiOiJYTW5sTVhRIn0.X4B5APkxkWVaiSg3KqMCaQ');
   const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
   const [mapReady, setMapReady] = useState<boolean>(true);
-  const [currentGeoJSON, setCurrentGeoJSON] = useState<any>(defaultGeoJSON);
+  const [currentGeoJSON, setCurrentGeoJSON] = useState<any>(activeGeoJSON);
 
   const handleApiKeySubmit = () => {
     setMapReady(false);
