@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
-import { ArrowDown, Layers, Maximize2, BarChart3 } from 'lucide-react';
+import { ArrowDown, Layers, Maximize2, BarChart3, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -109,13 +109,10 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
         
         console.log('Converted features for rendering:', features.length);
         
-        // Configure fill-extrusion-color based on metric
         let colorExpression;
         let heightExpression;
         
         if (metric.includes('conge') && stats.quantiles) {
-          // Use quantiles for congestion metrics
-          // Ensure the values are strictly ascending
           colorExpression = [
             'step',
             ['get', metric],
@@ -126,11 +123,10 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
             stats.quantiles[4], colors[4]
           ];
           
-          // Also use quantiles for height expression when showing congestion
           heightExpression = [
             'step',
             ['get', metric],
-            500, // Base height
+            500,
             stats.quantiles[1], 800,
             stats.quantiles[2], 1200,
             stats.quantiles[3], 1600,
@@ -139,7 +135,6 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
           
           console.log('Using quantile classification for congestion with breaks:', stats.quantiles);
         } else {
-          // Use linear interpolation for other metrics
           colorExpression = [
             'interpolate',
             ['linear'],
@@ -151,13 +146,12 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
             stats.max, colors[4],
           ];
           
-          // Regular linear interpolation for height with other metrics
           heightExpression = [
             'interpolate',
             ['linear'],
             ['get', metric],
-            stats.min, 500, // Base height for all metrics
-            stats.max, 2000 // Higher heights for high values
+            stats.min, 500,
+            stats.max, 2000
           ];
         }
         
@@ -239,12 +233,10 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
       setMetricStats(stats);
       setColorScale(colors);
       
-      // Configure color expression based on metric type
       let colorExpression;
       let heightExpression;
       
       if (metric.includes('conge') && stats.quantiles) {
-        // Use quantiles for congestion metrics
         colorExpression = [
           'step',
           ['get', metric],
@@ -255,11 +247,10 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
           stats.quantiles[4], colors[4]
         ];
         
-        // Also use quantiles for height expression when showing congestion
         heightExpression = [
           'step',
           ['get', metric],
-          500, // Base height
+          500,
           stats.quantiles[1], 800,
           stats.quantiles[2], 1200,
           stats.quantiles[3], 1600,
@@ -268,7 +259,6 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
         
         console.log('Using quantile classification for congestion with breaks:', stats.quantiles);
       } else {
-        // Use linear interpolation for other metrics
         colorExpression = [
           'interpolate',
           ['linear'],
@@ -280,13 +270,12 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
           stats.max, colors[4],
         ];
         
-        // Regular linear interpolation for height with other metrics
         heightExpression = [
           'interpolate',
           ['linear'],
           ['get', metric],
-          stats.min, 500, // Base height for all metrics
-          stats.max, 2000 // Higher heights for high values
+          stats.min, 500,
+          stats.max, 2000
         ];
       }
       
@@ -313,6 +302,10 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
       });
     }
   }, [fullscreen]);
+  
+  const handleMetricChange = (newMetric: string) => {
+    setMetric(newMetric);
+  };
   
   const getMetricLabel = (metricKey: string): string => {
     const labels: Record<string, string> = {
