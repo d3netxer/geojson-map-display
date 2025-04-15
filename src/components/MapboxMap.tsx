@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { ArrowDown, Layers, Maximize2, BarChart3, Info } from 'lucide-react';
@@ -27,7 +26,6 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
   const [metricStats, setMetricStats] = useState<any>(null);
   const [colorScale, setColorScale] = useState<string[]>([]);
   
-  // Validate Mapbox token
   const validateMapboxToken = (token: string) => {
     const tokenParts = token.split('.');
     if (tokenParts.length !== 3) {
@@ -37,49 +35,41 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
     return true;
   };
 
-  // Use the provided api key, with fallback
   const token = apiKey || 'pk.eyJ1IjoidGdlcnRpbiIsImEiOiJYTW5sTVhRIn0.X4B5APkxkWVaiSg3KqMCaQ';
 
   useEffect(() => {
     if (!mapContainer.current) return;
     
-    // Validate token before initializing
     if (!validateMapboxToken(token)) {
       toast.error('Please provide a valid Mapbox access token');
       setLoading(false);
       return;
     }
     
-    // Set mapbox token
     mapboxgl.accessToken = token;
     
     console.log("Initializing map with token:", token);
     
     try {
-      // Process GeoJSON data
       const { processedGeoJSON, metricStats: stats } = processGeoJSON(geoJSONData, metric);
       const colors = getColorScale(stats.min, stats.max);
       
-      // Store stats and colors for the legend
       setMetricStats(stats);
       setColorScale(colors);
       
-      // Initialize map with Riyadh coordinates (center of Saudi Arabia)
-      // Updated to use WGS84 coordinates for Riyadh
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
         style: mapStyle,
-        center: [46.67, 24.71], // Riyadh WGS84 coordinates
+        center: [46.67, 24.71],
         zoom: 11,
         minZoom: 10,
         maxZoom: 16,
         attributionControl: false,
-        pitch: 45, // Add a slight tilt for a 3D effect
+        pitch: 45,
       });
       
       const mapInstance = map.current;
       
-      // Add navigation controls
       mapInstance.addControl(
         new mapboxgl.NavigationControl({
           visualizePitch: true,
@@ -87,16 +77,13 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
         'bottom-right'
       );
       
-      // Add attribution control in a more minimalist position
       mapInstance.addControl(new mapboxgl.AttributionControl({
         compact: true
       }), 'bottom-left');
       
-      // Loading events
       mapInstance.on('load', () => {
         console.log('Map loaded successfully');
         
-        // Add the GeoJSON source
         mapInstance.addSource('riyadh-hexagons', {
           type: 'geojson',
           data: processedGeoJSON,
@@ -104,7 +91,6 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
         
         console.log('Adding hexagon layers with features count:', processedGeoJSON.features.length);
         
-        // Convert MultiPolygon to Polygon for better rendering
         const features = processedGeoJSON.features.map((feature: any) => {
           const newFeature = { ...feature };
           if (feature.geometry.type === 'MultiPolygon') {
@@ -116,7 +102,6 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
           return newFeature;
         });
         
-        // Update the source with converted features
         mapInstance.getSource('riyadh-hexagons').setData({
           type: 'FeatureCollection',
           features: features
@@ -124,7 +109,6 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
         
         console.log('Converted features for rendering:', features.length);
         
-        // Add 3D hexagon layer
         mapInstance.addLayer({
           id: 'hexagons-fill',
           type: 'fill-extrusion',
@@ -144,15 +128,14 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
               'interpolate',
               ['linear'],
               ['get', metric],
-              stats.min, 500,  // Increased minimum height for better visibility
-              stats.max, 2000  // Increased maximum height for better visualization
+              stats.min, 500,
+              stats.max, 2000
             ],
             'fill-extrusion-base': 0,
             'fill-extrusion-opacity': 0.8,
           }
         });
         
-        // Add outline layer
         mapInstance.addLayer({
           id: 'hexagons-outline',
           type: 'line',
@@ -163,17 +146,14 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
           }
         });
         
-        // Click event to get hexagon info
         mapInstance.on('click', 'hexagons-fill', (e) => {
           if (!e.features || e.features.length === 0) return;
           
           const feature = e.features[0];
           setSelectedFeature(feature);
           
-          // Create popup at click point
           const coordinates = e.lngLat;
           
-          // Fly to the clicked hexagon
           mapInstance.flyTo({
             center: coordinates,
             zoom: Math.max(mapInstance.getZoom(), 13.5),
@@ -184,7 +164,6 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
           toast.success(`Selected Grid ${feature.properties.GRID_ID}`);
         });
         
-        // Change cursor on hover
         mapInstance.on('mouseenter', 'hexagons-fill', () => {
           mapInstance.getCanvas().style.cursor = 'pointer';
         });
@@ -193,10 +172,8 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
           mapInstance.getCanvas().style.cursor = '';
         });
         
-        // Hide loading indicator
         setLoading(false);
         
-        // Show success toast when map is loaded
         toast.success(`Map data loaded successfully with ${processedGeoJSON.features.length} hexagons!`);
       });
       
@@ -206,7 +183,6 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
       setLoading(false);
     }
 
-    // Clean up on unmount
     return () => {
       if (map.current) {
         map.current.remove();
@@ -214,20 +190,16 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
     };
   }, [token, mapStyle, geoJSONData, metric]);
   
-  // Update the metric when it changes
   useEffect(() => {
     if (!map.current || !map.current.isStyleLoaded() || !map.current.getLayer('hexagons-fill')) return;
     
     try {
-      // Process GeoJSON data for the new metric
       const { metricStats: stats } = processGeoJSON(geoJSONData, metric);
       const colors = getColorScale(stats.min, stats.max, metric);
       
-      // Update stats and colors for the legend
       setMetricStats(stats);
       setColorScale(colors);
       
-      // Update layer styles
       map.current.setPaintProperty('hexagons-fill', 'fill-extrusion-color', [
         'interpolate',
         ['linear'],
@@ -253,7 +225,6 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
     }
   }, [metric]);
   
-  // Handle fullscreen toggle
   useEffect(() => {
     if (!mapContainer.current) return;
     
@@ -269,25 +240,21 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
     }
   }, [fullscreen]);
   
-  // Handle metric change
   const handleMetricChange = (newMetric: string) => {
     setMetric(newMetric);
   };
   
-  // Get human-readable metric label
   const getMetricLabel = (metricKey: string): string => {
     const labels: Record<string, string> = {
       'mean_speed': 'Average Speed (km/h)',
       'mean_conge': 'Congestion Level',
       'sum_vktkm': 'Total Vehicle Kilometers',
-      'sum_urban_': 'Urban Road Length',
-      'mean_segme': 'Average Segment Length'
+      'sum_urban_': 'Urban Road Length'
     };
     
     return labels[metricKey] || metricKey;
   };
   
-  // Toggle map style
   const toggleMapStyle = () => {
     const styles = [
       'mapbox://styles/mapbox/light-v11',
@@ -315,7 +282,6 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
       
       <div ref={mapContainer} className="map-container" />
       
-      {/* Title Overlay */}
       <div className="map-overlay">
         <div className="chip mb-2">Traffic Analysis</div>
         <h1 className="text-2xl font-bold tracking-tight mb-1">Riyadh Hexagonal Grid Analysis</h1>
@@ -337,7 +303,6 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
         </div>
       </div>
       
-      {/* Legend Component */}
       {metricStats && colorScale.length > 0 && (
         <MapLegend 
           title={`${getMetricLabel(metric)}`}
@@ -348,7 +313,6 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
         />
       )}
       
-      {/* Map Controls */}
       <div className="map-control">
         <Button 
           variant="secondary" 
@@ -405,19 +369,11 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
               </Button>
               <Button 
                 variant={metric === 'sum_urban_' ? 'default' : 'ghost'} 
-                className="w-full justify-start mb-1" 
+                className="w-full justify-start" 
                 size="sm"
                 onClick={() => handleMetricChange('sum_urban_')}
               >
                 Urban Road Length
-              </Button>
-              <Button 
-                variant={metric === 'mean_segme' ? 'default' : 'ghost'} 
-                className="w-full justify-start" 
-                size="sm"
-                onClick={() => handleMetricChange('mean_segme')}
-              >
-                Segment Length
               </Button>
             </div>
           </PopoverContent>
@@ -461,9 +417,6 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
                   
                   <div className="font-medium">Urban Road Length:</div>
                   <div className="text-right">{selectedFeature.properties.sum_urban_.toFixed(0)} m</div>
-                  
-                  <div className="font-medium">Avg Segment Length:</div>
-                  <div className="text-right">{selectedFeature.properties.mean_segme.toFixed(1)} m</div>
                 </div>
               </div>
             </PopoverContent>
