@@ -7,10 +7,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Input } from '@/components/ui/input';
 import { Info } from 'lucide-react';
 
+// Import the default GeoJSON data
+import defaultGeoJSON from '../data/defaultGeoJSON';
+
 const Index = () => {
   const [apiKey, setApiKey] = useState<string>('pk.eyJ1IjoidGdlcnRpbiIsImEiOiJYTW5sTVhRIn0.X4B5APkxkWVaiSg3KqMCaQ');
   const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
   const [mapReady, setMapReady] = useState<boolean>(true);
+  const [currentGeoJSON, setCurrentGeoJSON] = useState<any>(defaultGeoJSON);
 
   const handleApiKeySubmit = () => {
     setMapReady(false);
@@ -18,6 +22,15 @@ const Index = () => {
     setTimeout(() => {
       setMapReady(true);
       setShowApiKeyModal(false);
+    }, 100);
+  };
+
+  const handleGeoJSONChange = (newGeoJSON: any) => {
+    setMapReady(false);
+    // Brief timeout to allow the map to re-initialize with the new GeoJSON
+    setTimeout(() => {
+      setCurrentGeoJSON(newGeoJSON);
+      setMapReady(true);
     }, 100);
   };
 
@@ -36,7 +49,7 @@ const Index = () => {
       </Button>
       
       {/* Map Component */}
-      {mapReady && <MapboxMap apiKey={apiKey} />}
+      {mapReady && <MapboxMap apiKey={apiKey} geoJSONData={currentGeoJSON} onGeoJSONChange={handleGeoJSONChange} />}
       
       {/* API Key Dialog */}
       <Dialog open={showApiKeyModal} onOpenChange={setShowApiKeyModal}>
