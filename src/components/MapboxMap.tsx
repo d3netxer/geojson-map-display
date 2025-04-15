@@ -64,12 +64,13 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
       setMetricStats(stats);
       setColorScale(colors);
       
-      // Initialize map
+      // Initialize map with Riyadh coordinates (center of Saudi Arabia)
+      // Updated to use WGS84 coordinates for Riyadh
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
         style: mapStyle,
-        center: [46.75, 24.68], // Center on Riyadh
-        zoom: 12,
+        center: [46.67, 24.71], // Riyadh WGS84 coordinates
+        zoom: 11,
         minZoom: 10,
         maxZoom: 16,
         attributionControl: false,

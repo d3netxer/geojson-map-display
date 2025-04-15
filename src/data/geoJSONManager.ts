@@ -20,84 +20,38 @@ const isWebMercator = (geojson: any): boolean => {
   return false;
 };
 
-// Function to convert Web Mercator coordinates to WGS84 (lat/long)
-// This is a simplified conversion that works well enough for small areas
-const convertWebMercatorToWGS84 = (x: number, y: number): [number, number] => {
-  const lon = (x * 180) / 20037508.34;
-  let lat = (y * 180) / 20037508.34;
-  lat = (180 / Math.PI) * (2 * Math.atan(Math.exp((lat * Math.PI) / 180)) - Math.PI / 2);
-  return [lon, lat];
-};
-
-// Function to transform GeoJSON from Web Mercator to WGS84 if needed
-const transformGeoJSONIfNeeded = (geojson: any): any => {
-  if (!isWebMercator(geojson)) {
-    return geojson; // Already in WGS84 or unknown CRS, return as is
+// Function to check if a GeoJSON is in WGS84 (CRS:84/EPSG:4326) projection
+const isWGS84 = (geojson: any): boolean => {
+  if (!geojson?.crs) {
+    // GeoJSON without CRS specification defaults to WGS84 according to the spec
+    return true;
   }
-
-  console.log('Converting Web Mercator GeoJSON to WGS84');
   
-  // Create a deep copy to avoid modifying the original
-  const transformedGeoJSON = JSON.parse(JSON.stringify(geojson));
+  if (geojson.crs?.properties?.name) {
+    return geojson.crs.properties.name.includes('CRS84') || 
+           geojson.crs.properties.name.includes('4326');
+  }
   
-  // Update the CRS to WGS84
-  transformedGeoJSON.crs = {
-    type: 'name',
-    properties: { name: 'urn:ogc:def:crs:OGC:1.3:CRS84' }
-  };
-  
-  // Transform all features' coordinates
-  transformedGeoJSON.features = geojson.features.map((feature: any) => {
-    const newFeature = { ...feature };
-    
-    // Handle MultiPolygon geometry
-    if (feature.geometry.type === 'MultiPolygon') {
-      newFeature.geometry = {
-        ...feature.geometry,
-        coordinates: feature.geometry.coordinates.map((polygons: number[][][][]) => {
-          return polygons.map((polygon: number[][][]) => {
-            return polygon.map((ring: number[][]) => {
-              return ring.map((coord: number[]) => {
-                return convertWebMercatorToWGS84(coord[0], coord[1]);
-              });
-            });
-          });
-        })
-      };
-    }
-    // Handle Polygon geometry (if needed)
-    else if (feature.geometry.type === 'Polygon') {
-      newFeature.geometry = {
-        ...feature.geometry,
-        coordinates: feature.geometry.coordinates.map((polygon: number[][][]) => {
-          return polygon.map((ring: number[][]) => {
-            return ring.map((coord: number[]) => {
-              return convertWebMercatorToWGS84(coord[0], coord[1]);
-            });
-          });
-        })
-      };
-    }
-    
-    return newFeature;
-  });
-  
-  return transformedGeoJSON;
+  return false;
 };
 
 // Function to get the active dataset based on environment configuration
 export const getActiveGeoJSON = () => {
-  // Get the raw dataset based on the environment variable
-  const rawGeoJSON = datasets[GEOJSON_SOURCE as keyof typeof datasets] || defaultGeoJSON;
+  // Get the dataset based on the environment variable
+  const geoJSON = datasets[GEOJSON_SOURCE as keyof typeof datasets] || defaultGeoJSON;
   
-  // Transform the GeoJSON if it's in Web Mercator projection
-  return transformGeoJSONIfNeeded(rawGeoJSON);
+  // Verify that the GeoJSON is in WGS84 format
+  if (!isWGS84(geoJSON)) {
+    console.warn('The GeoJSON data is not in WGS84 format. This may cause rendering issues.');
+  }
+  
+  return geoJSON;
 };
 
 // Export all datasets for direct access if needed
 export const geoJSONDatasets = {
-  default: transformGeoJSONIfNeeded(defaultGeoJSON),
-  custom: transformGeoJSONIfNeeded(customGeoJSON)
+  default: defaultGeoJSON,
+  custom: customGeoJSON
 };
 
 // Default export is the active dataset
