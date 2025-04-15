@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { ArrowDown, Layers, Maximize2, BarChart3, Info } from 'lucide-react';
@@ -112,21 +111,41 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
         
         console.log('Converted features for rendering:', features.length);
         
+        // Configure fill-extrusion-color based on metric
+        let colorExpression;
+        
+        if (metric.includes('conge') && stats.quantiles) {
+          // Use quantiles for congestion metrics
+          colorExpression = [
+            'step',
+            ['get', metric],
+            colors[0],
+            stats.quantiles[1], colors[1],
+            stats.quantiles[2], colors[2],
+            stats.quantiles[3], colors[3],
+            stats.quantiles[4], colors[4]
+          ];
+          console.log('Using quantile classification for congestion with breaks:', stats.quantiles);
+        } else {
+          // Use linear interpolation for other metrics
+          colorExpression = [
+            'interpolate',
+            ['linear'],
+            ['get', metric],
+            stats.min, colors[0],
+            stats.min + (stats.range * 0.25), colors[1],
+            stats.min + (stats.range * 0.5), colors[2],
+            stats.min + (stats.range * 0.75), colors[3],
+            stats.max, colors[4],
+          ];
+        }
+        
         mapInstance.addLayer({
           id: 'hexagons-fill',
           type: 'fill-extrusion',
           source: 'riyadh-hexagons',
           paint: {
-            'fill-extrusion-color': [
-              'interpolate',
-              ['linear'],
-              ['get', metric],
-              stats.min, colors[0],
-              stats.min + (stats.range * 0.25), colors[1],
-              stats.min + (stats.range * 0.5), colors[2],
-              stats.min + (stats.range * 0.75), colors[3],
-              stats.max, colors[4],
-            ],
+            'fill-extrusion-color': colorExpression,
             'fill-extrusion-height': [
               'interpolate',
               ['linear'],
@@ -205,16 +224,36 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
       setMetricStats(stats);
       setColorScale(colors);
       
-      map.current.setPaintProperty('hexagons-fill', 'fill-extrusion-color', [
-        'interpolate',
-        ['linear'],
-        ['get', metric],
-        stats.min, colors[0],
-        stats.min + (stats.range * 0.25), colors[1],
-        stats.min + (stats.range * 0.5), colors[2],
-        stats.min + (stats.range * 0.75), colors[3],
-        stats.max, colors[4],
-      ]);
+      // Configure color expression based on metric type
+      let colorExpression;
+      
+      if (metric.includes('conge') && stats.quantiles) {
+        // Use quantiles for congestion metrics
+        colorExpression = [
+          'step',
+          ['get', metric],
+          colors[0],
+          stats.quantiles[1], colors[1],
+          stats.quantiles[2], colors[2],
+          stats.quantiles[3], colors[3],
+          stats.quantiles[4], colors[4]
+        ];
+        console.log('Using quantile classification for congestion with breaks:', stats.quantiles);
+      } else {
+        // Use linear interpolation for other metrics
+        colorExpression = [
+          'interpolate',
+          ['linear'],
+          ['get', metric],
+          stats.min, colors[0],
+          stats.min + (stats.range * 0.25), colors[1],
+          stats.min + (stats.range * 0.5), colors[2],
+          stats.min + (stats.range * 0.75), colors[3],
+          stats.max, colors[4],
+        ];
+      }
+      
+      map.current.setPaintProperty('hexagons-fill', 'fill-extrusion-color', colorExpression);
       
       map.current.setPaintProperty('hexagons-fill', 'fill-extrusion-height', [
         'interpolate',
@@ -315,6 +354,7 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
           max={metricStats.max}
           colorScale={colorScale}
           metric={metric}
+          quantiles={metricStats.quantiles}
         />
       )}
       

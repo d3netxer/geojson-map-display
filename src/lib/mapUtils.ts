@@ -8,6 +8,7 @@ interface MetricStats {
   max: number;
   range: number;
   avg: number;
+  quantiles?: number[];
 }
 
 /**
@@ -23,6 +24,24 @@ export function processGeoJSON(geojson: any, metric: string = 'mean_speed') {
   const max = Math.max(...metricValues);
   const range = max - min;
   const avg = metricValues.reduce((sum: number, val: number) => sum + val, 0) / metricValues.length;
+  
+  // Calculate quantiles for congestion metric (5 quantiles for 5 color classes)
+  let quantiles: number[] | undefined = undefined;
+  
+  if (metric.includes('conge')) {
+    // Sort values for quantile calculation
+    const sortedValues = [...metricValues].sort((a, b) => a - b);
+    quantiles = [
+      min,
+      sortedValues[Math.floor(sortedValues.length * 0.2)],
+      sortedValues[Math.floor(sortedValues.length * 0.4)],
+      sortedValues[Math.floor(sortedValues.length * 0.6)],
+      sortedValues[Math.floor(sortedValues.length * 0.8)],
+      max
+    ];
+    
+    console.log('Quantiles for congestion:', quantiles);
+  }
   
   // Copy the GeoJSON to avoid mutating the original
   const processedGeoJSON = JSON.parse(JSON.stringify(geojson));
@@ -42,7 +61,7 @@ export function processGeoJSON(geojson: any, metric: string = 'mean_speed') {
   
   return {
     processedGeoJSON,
-    metricStats: { min, max, range, avg }
+    metricStats: { min, max, range, avg, quantiles }
   };
 }
 
@@ -116,3 +135,4 @@ export function getHeightMultiplier(value: number, min: number, max: number, met
   if (range === 0) return 1;
   return 1 + ((value - min) / range);
 }
+

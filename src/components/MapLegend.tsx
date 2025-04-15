@@ -8,20 +8,28 @@ interface MapLegendProps {
   max: number;
   colorScale: string[];
   metric: string;
+  quantiles?: number[];
 }
 
-const MapLegend: React.FC<MapLegendProps> = ({ title, min, max, colorScale, metric }) => {
-  // Calculate intermediate values for the legend
-  const range = max - min;
-  const step = range / 4;
+const MapLegend: React.FC<MapLegendProps> = ({ title, min, max, colorScale, metric, quantiles }) => {
+  // Calculate legend values based on quantiles or even distribution
+  let legendValues: number[];
   
-  const legendValues = [
-    min,
-    min + step,
-    min + (step * 2),
-    min + (step * 3),
-    max
-  ];
+  if (metric.includes('conge') && quantiles) {
+    legendValues = quantiles;
+  } else {
+    // Calculate intermediate values for the legend with even distribution
+    const range = max - min;
+    const step = range / 4;
+    
+    legendValues = [
+      min,
+      min + step,
+      min + (step * 2),
+      min + (step * 3),
+      max
+    ];
+  }
   
   return (
     <div className="absolute left-4 bottom-8 z-10 glass-card p-4 rounded-xl max-w-xs animate-fade-in">
@@ -41,6 +49,11 @@ const MapLegend: React.FC<MapLegendProps> = ({ title, min, max, colorScale, metr
           </div>
         ))}
       </div>
+      {metric.includes('conge') && (
+        <div className="text-xs text-muted-foreground mt-2">
+          Using quantile classification
+        </div>
+      )}
     </div>
   );
 };
