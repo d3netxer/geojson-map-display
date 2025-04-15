@@ -191,8 +191,6 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
             duration: 1000,
             essential: true
           });
-          
-          toast.success(`Selected Grid ${feature.properties.GRID_ID}`);
         });
         
         mapInstance.on('mouseenter', 'hexagons-fill', () => {
