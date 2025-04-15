@@ -49,8 +49,8 @@ export function processGeoJSON(geojson: any, metric: string = 'mean_speed') {
 /**
  * Generate a color scale for the given metric range
  */
-export function getColorScale(min: number, max: number) {
-  // Different color scales based on metric ranges
+export function getColorScale(min: number, max: number, metric?: string) {
+  // Different color scales based on metric types
   const colorScales: Record<string, string[]> = {
     // Cool blue scale (good for speed)
     blue: ['#cfe2f3', '#9fc5e8', '#6fa8dc', '#3d85c6', '#0b5394'],
@@ -65,7 +65,18 @@ export function getColorScale(min: number, max: number) {
     purple: ['#d9d2e9', '#b4a7d6', '#8e7cc3', '#674ea7', '#351c75'],
   };
   
-  // Default to blue scale for now, but could be selected based on metric type
+  // Select color scale based on metric name if provided
+  if (metric) {
+    if (metric.includes('conge')) {
+      return colorScales.red;
+    } else if (metric.includes('urban_')) {
+      return colorScales.purple;
+    } else if (metric.includes('vktkm')) {
+      return colorScales.green;
+    }
+  }
+  
+  // Default to blue scale for speed and other metrics
   return colorScales.blue;
 }
 

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { ArrowDown, Layers, Maximize2, BarChart3, Info } from 'lucide-react';
@@ -6,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
 import { processGeoJSON, getColorScale, formatValue } from '@/lib/mapUtils';
+import MapLegend from './MapLegend';
 
 interface MapboxMapProps {
   apiKey?: string;
@@ -35,6 +37,8 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey }) => {
   const [selectedFeature, setSelectedFeature] = useState<any>(null);
   const [mapStyle, setMapStyle] = useState<string>('mapbox://styles/mapbox/light-v11');
   const [fullscreen, setFullscreen] = useState<boolean>(false);
+  const [metricStats, setMetricStats] = useState<any>(null);
+  const [colorScale, setColorScale] = useState<string[]>([]);
   
   // Validate Mapbox token
   const validateMapboxToken = (token: string) => {
@@ -66,8 +70,12 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey }) => {
     
     try {
       // Process GeoJSON data
-      const { processedGeoJSON, metricStats } = processGeoJSON(riyadhGeoJSON, metric);
-      const colorScale = getColorScale(metricStats.min, metricStats.max);
+      const { processedGeoJSON, metricStats: stats } = processGeoJSON(riyadhGeoJSON, metric);
+      const colors = getColorScale(stats.min, stats.max);
+      
+      // Store stats and colors for the legend
+      setMetricStats(stats);
+      setColorScale(colors);
       
       // Initialize map
       map.current = new mapboxgl.Map({
@@ -138,18 +146,18 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey }) => {
               'interpolate',
               ['linear'],
               ['get', metric],
-              metricStats.min, colorScale[0],
-              metricStats.min + (metricStats.range * 0.25), colorScale[1],
-              metricStats.min + (metricStats.range * 0.5), colorScale[2],
-              metricStats.min + (metricStats.range * 0.75), colorScale[3],
-              metricStats.max, colorScale[4],
+              stats.min, colors[0],
+              stats.min + (stats.range * 0.25), colors[1],
+              stats.min + (stats.range * 0.5), colors[2],
+              stats.min + (stats.range * 0.75), colors[3],
+              stats.max, colors[4],
             ],
             'fill-extrusion-height': [
               'interpolate',
               ['linear'],
               ['get', metric],
-              metricStats.min, 500,  // Increased minimum height for better visibility
-              metricStats.max, 2000  // Increased maximum height for better visualization
+              stats.min, 500,  // Increased minimum height for better visibility
+              stats.max, 2000  // Increased maximum height for better visualization
             ],
             'fill-extrusion-base': 0,
             'fill-extrusion-opacity': 0.8,
@@ -216,8 +224,12 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey }) => {
     if (!map.current || !map.current.isStyleLoaded() || !map.current.getLayer('hexagons-fill')) return;
     
     // Process GeoJSON data for the new metric
-    const { metricStats } = processGeoJSON(riyadhGeoJSON, metric);
-    const colorScale = getColorScale(metricStats.min, metricStats.max);
+    const { metricStats: stats } = processGeoJSON(riyadhGeoJSON, metric);
+    const colors = getColorScale(stats.min, stats.max);
+    
+    // Update stats and colors for the legend
+    setMetricStats(stats);
+    setColorScale(colors);
     
     try {
       // Update layer styles
@@ -225,19 +237,19 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey }) => {
         'interpolate',
         ['linear'],
         ['get', metric],
-        metricStats.min, colorScale[0],
-        metricStats.min + (metricStats.range * 0.25), colorScale[1],
-        metricStats.min + (metricStats.range * 0.5), colorScale[2],
-        metricStats.min + (metricStats.range * 0.75), colorScale[3],
-        metricStats.max, colorScale[4],
+        stats.min, colors[0],
+        stats.min + (stats.range * 0.25), colors[1],
+        stats.min + (stats.range * 0.5), colors[2],
+        stats.min + (stats.range * 0.75), colors[3],
+        stats.max, colors[4],
       ]);
       
       map.current.setPaintProperty('hexagons-fill', 'fill-extrusion-height', [
         'interpolate',
         ['linear'],
         ['get', metric],
-        metricStats.min, 500,
-        metricStats.max, 2000
+        stats.min, 500,
+        stats.max, 2000
       ]);
       
       toast.success(`Visualizing: ${getMetricLabel(metric)}`);
@@ -329,6 +341,17 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey }) => {
           <span className="info-value">Central Riyadh</span>
         </div>
       </div>
+      
+      {/* Legend Component */}
+      {metricStats && colorScale.length > 0 && (
+        <MapLegend 
+          title={`${getMetricLabel(metric)}`}
+          min={metricStats.min}
+          max={metricStats.max}
+          colorScale={colorScale}
+          metric={metric}
+        />
+      )}
       
       {/* Map Controls */}
       <div className="map-control">
