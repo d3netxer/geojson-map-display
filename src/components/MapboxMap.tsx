@@ -52,7 +52,7 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
     
     try {
       const { processedGeoJSON, metricStats: stats } = processGeoJSON(geoJSONData, metric);
-      const colors = getColorScale(stats.min, stats.max);
+      const colors = getColorScale(stats.min, stats.max, metric);
       
       setMetricStats(stats);
       setColorScale(colors);
@@ -196,6 +196,8 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onGeoJSONCha
     try {
       const { metricStats: stats } = processGeoJSON(geoJSONData, metric);
       const colors = getColorScale(stats.min, stats.max, metric);
+      
+      console.log(`Updating visualization for ${metric} with colors:`, colors);
       
       setMetricStats(stats);
       setColorScale(colors);
