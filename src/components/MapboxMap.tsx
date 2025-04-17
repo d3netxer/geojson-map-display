@@ -167,24 +167,6 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
           }
         });
         
-        mapInstance.addLayer({
-          id: 'hexagons-outline',
-          type: 'line',
-          source: 'riyadh-hexagons',
-          layout: {
-            'line-join': 'miter',
-            'line-cap': 'butt'
-          },
-          paint: {
-            'line-color': 'rgba(255, 255, 255, 0.8)',
-            'line-width': 1.5,
-            'line-opacity': 0.9,
-            'line-translate': [0, 0],
-            'line-offset': 0,
-            'line-gap-width': 0
-          }
-        });
-        
         mapInstance.on('click', 'hexagons-fill', (e) => {
           if (!e.features || e.features.length === 0) return;
           
