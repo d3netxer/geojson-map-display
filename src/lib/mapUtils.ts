@@ -33,7 +33,6 @@ export function processGeoJSON(geojson: any, metric: string = 'mean_speed') {
     const sortedValues = [...metricValues].sort((a, b) => a - b);
     
     // Ensure we have unique, ascending values for the quantiles
-    // This is critical for Mapbox's step expression which requires strictly ascending values
     const length = sortedValues.length;
     quantiles = [
       min,
@@ -58,7 +57,7 @@ export function processGeoJSON(geojson: any, metric: string = 'mean_speed') {
   // Copy the GeoJSON to avoid mutating the original
   const processedGeoJSON = JSON.parse(JSON.stringify(geojson));
   
-  // Ensure each feature has the metric property as a number
+  // Convert properties to attributes for ArcGIS compatibility
   processedGeoJSON.features = features.map((feature: any) => {
     // Make a copy of the feature
     const newFeature = { ...feature };
@@ -67,6 +66,9 @@ export function processGeoJSON(geojson: any, metric: string = 'mean_speed') {
     if (newFeature.properties[metric] === undefined || isNaN(newFeature.properties[metric])) {
       newFeature.properties[metric] = min;
     }
+    
+    // Add attributes field for ArcGIS
+    newFeature.attributes = { ...newFeature.properties };
     
     return newFeature;
   });
@@ -146,4 +148,28 @@ export function getHeightMultiplier(value: number, min: number, max: number, met
   const range = max - min;
   if (range === 0) return 1;
   return 1 + ((value - min) / range);
+}
+
+/**
+ * Convert a hex color to RGB array
+ * Used for ArcGIS color specifications
+ */
+export function hexToRgb(hex: string): [number, number, number, number] {
+  // Remove the hash if it exists
+  hex = hex.replace(/^#/, '');
+
+  // Parse the hex values
+  let r, g, b;
+  if (hex.length === 3) {
+    r = parseInt(hex[0] + hex[0], 16);
+    g = parseInt(hex[1] + hex[1], 16);
+    b = parseInt(hex[2] + hex[2], 16);
+  } else {
+    r = parseInt(hex.substring(0, 2), 16);
+    g = parseInt(hex.substring(2, 4), 16);
+    b = parseInt(hex.substring(4, 6), 16);
+  }
+
+  // Return as RGB array with alpha=1
+  return [r, g, b, 1];
 }

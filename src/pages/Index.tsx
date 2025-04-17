@@ -1,7 +1,8 @@
+
 import { useState, useEffect } from 'react';
 import { Toaster } from "sonner";
 import { toast } from "sonner";
-import MapboxMap from '../components/MapboxMap';
+import ArcGISMap from '../components/ArcGISMap';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -11,9 +12,9 @@ import { Info } from 'lucide-react';
 import activeGeoJSON, { getActiveGeoJSON, geoJSONDatasets } from '../data/geoJSONManager';
 
 const Index = () => {
-  const [apiKey, setApiKey] = useState<string>('pk.eyJ1IjoidGdlcnRpbiIsImEiOiJYTW5sTVhRIn0.X4B5APkxkWVaiSg3KqMCaQ');
-  const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
-  const [mapReady, setMapReady] = useState<boolean>(true);
+  const [apiKey, setApiKey] = useState<string>('');
+  const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(true);
+  const [mapReady, setMapReady] = useState<boolean>(false);
   const [currentGeoJSON, setCurrentGeoJSON] = useState<any>(activeGeoJSON);
   const [datasetSource, setDatasetSource] = useState<string>(import.meta.env.VITE_GEOJSON_SOURCE || 'default');
 
@@ -26,11 +27,17 @@ const Index = () => {
   }, []);
 
   const handleApiKeySubmit = () => {
+    if (!apiKey.trim()) {
+      toast.error('Please enter a valid ArcGIS API key');
+      return;
+    }
+    
     setMapReady(false);
     // Brief timeout to allow the map to re-initialize with the new API key
     setTimeout(() => {
       setMapReady(true);
       setShowApiKeyModal(false);
+      toast.success('ArcGIS API key applied successfully');
     }, 100);
   };
 
@@ -72,31 +79,31 @@ const Index = () => {
       </Button>
       
       {/* Map Component */}
-      {mapReady && <MapboxMap apiKey={apiKey} geoJSONData={currentGeoJSON} />}
+      {(mapReady || apiKey) && <ArcGISMap apiKey={apiKey} geoJSONData={currentGeoJSON} />}
       
       {/* API Key Dialog */}
       <Dialog open={showApiKeyModal} onOpenChange={setShowApiKeyModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Map Configuration</DialogTitle>
+            <DialogTitle>ArcGIS Map Configuration</DialogTitle>
             <DialogDescription>
-              This application uses Mapbox to visualize geospatial data. You can use your own Mapbox API key for better performance.
+              This application uses ArcGIS to visualize geospatial data. You need to provide an ArcGIS API key to continue.
             </DialogDescription>
           </DialogHeader>
           
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <label htmlFor="apiKey" className="text-sm font-medium">
-                Mapbox API Key
+                ArcGIS API Key
               </label>
               <Input
                 id="apiKey"
-                placeholder="Enter your Mapbox API key"
+                placeholder="Enter your ArcGIS API key"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                If you want to use a different Mapbox API key, enter it here and click Apply Changes.
+                You need an ArcGIS API key to use this application. You can get one from the ArcGIS Developer portal.
               </p>
             </div>
             
@@ -107,14 +114,14 @@ const Index = () => {
               <div className="bg-muted p-2 rounded-md text-sm">
                 <p>Current: <span className="font-semibold">{datasetSource}</span> ({currentGeoJSON.features.length} features)</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  To switch datasets in development, set the <code>REACT_APP_GEOJSON_SOURCE</code> environment variable to 'default' or 'custom'.
+                  To switch datasets in development, set the <code>VITE_GEOJSON_SOURCE</code> environment variable to 'default' or 'custom'.
                 </p>
               </div>
             </div>
             
             <div className="flex justify-end">
               <Button type="button" onClick={handleApiKeySubmit}>
-                Apply Changes
+                Apply API Key
               </Button>
             </div>
           </div>
