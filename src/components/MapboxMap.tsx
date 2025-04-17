@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { ArrowDown, Layers, Maximize2, BarChart3, Info } from 'lucide-react';
@@ -156,7 +155,6 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
           ];
         }
         
-        // Add the 3D fill extrusion layer for the hexagons
         mapInstance.addLayer({
           id: 'hexagons-fill',
           type: 'fill-extrusion',
@@ -169,20 +167,21 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
           }
         });
         
-        // Add a separate outline layer for the hexagon boundaries that sits at ground level
-        // This ensures the outlines match the hexagon base footprint
         mapInstance.addLayer({
           id: 'hexagons-outline',
           type: 'line',
           source: 'riyadh-hexagons',
           layout: {
-            'line-join': 'round',
-            'line-cap': 'round'
+            'line-join': 'miter',
+            'line-cap': 'butt'
           },
           paint: {
-            'line-color': 'rgba(255, 255, 255, 0.7)',
+            'line-color': 'rgba(255, 255, 255, 0.8)',
             'line-width': 1.5,
-            'line-opacity': 0.8
+            'line-opacity': 0.9,
+            'line-translate': [0, 0],
+            'line-offset': 0,
+            'line-gap-width': 0
           }
         });
         
