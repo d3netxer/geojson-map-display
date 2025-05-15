@@ -60,7 +60,7 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
       esriConfig.apiKey = token;
     }
     
-    console.log("Initializing ArcGIS map");
+    console.log("Initializing ArcGIS map with basemap:", mapStyle);
     
     try {
       // Process the GeoJSON data for the selected metric
@@ -78,9 +78,9 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
       setMetricStats(stats);
       setColorScale(translucentColors);
 
-      // Create a new Map instance with a basemap, making streets more prominent
+      // Create a new Map instance with a streets basemap
       const map = new Map({
-        basemap: "streets" // Explicitly set to "streets" basemap
+        basemap: "streets" // This should ensure streets are visible
       });
 
       // Create a graphics layer to hold selected features
@@ -108,8 +108,8 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
                 size: 350, // Default size (reduced height)
                 material: { 
                   color: translucentColors[0],
-                  // Use opacity instead of transparency for TypeScript compatibility
-                  opacity: 0.6
+                  // Fix the TypeScript error by using transparency instead of opacity
+                  transparency: 0.4 
                 }
               }
             ]
@@ -153,9 +153,9 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
           position: {
             x: 46.67,
             y: 24.71,
-            z: 30000  // Increase altitude for better overview
+            z: 20000  // Reduced altitude to see street basemap better
           },
-          tilt: 30, // Less tilt to see more of the map from above
+          tilt: 15, // Less tilt to see more of the map from above
           heading: 0
         },
         environment: {
@@ -163,7 +163,6 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
             directShadowsEnabled: true,
             date: new Date()
           },
-          // Fix TypeScript error by removing atmosphere property
           starsEnabled: false,
           atmosphereEnabled: true
         } as any, // Type assertion to fix TypeScript error
@@ -177,6 +176,18 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
         ui: {
           components: ["zoom", "compass", "attribution"]
         }
+      });
+      
+      // Fix to ensure basemap is loaded first before adding layers
+      view.when(() => {
+        console.log('ArcGIS SceneView loaded successfully');
+        console.log('Current basemap:', map.basemap?.id);
+        
+        // Force basemap refresh if needed
+        map.basemap = map.basemap;
+        
+        setLoading(false);
+        toast.success(`Map data loaded successfully with ${processedGeoJSON.features.length} hexagons!`);
       });
       
       mapView.current = view;
@@ -213,12 +224,6 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
             }
           }
         });
-      });
-      
-      view.when(() => {
-        console.log('ArcGIS SceneView loaded successfully');
-        setLoading(false);
-        toast.success(`Map data loaded successfully with ${processedGeoJSON.features.length} hexagons!`);
       });
 
     } catch (error) {
