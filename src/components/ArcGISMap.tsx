@@ -16,6 +16,8 @@ import { SimpleRenderer } from '@arcgis/core/renderers';
 import { ExtrudeSymbol3DLayer, PolygonSymbol3D } from '@arcgis/core/symbols';
 import GraphicsLayer from '@arcgis/core/layers/GraphicsLayer';
 import Color from '@arcgis/core/Color';
+import NavigationToggle from '@arcgis/core/widgets/NavigationToggle';
+import Zoom from '@arcgis/core/widgets/Zoom';
 
 // Import ESRI CSS
 import '@arcgis/core/assets/esri/themes/light/main.css';
@@ -107,8 +109,8 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
                 size: 350, // Default size (reduced height)
                 material: { 
                   color: translucentColors[0],
-                  // Fix TypeScript error by using opacity instead
-                  opacity: 0.6
+                  // Must use transparency (0-1) for ExtrudeSymbol3DLayerMaterialProperties
+                  transparency: 0.4
                 }
               }
             ]
@@ -174,31 +176,57 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
             breakpoint: false
           }
         },
+        // Don't include UI components here, we'll add them manually
         ui: {
-          components: ["zoom", "compass", "attribution"],
+          components: [],
           padding: {
-            bottom: 15,
-            right: 15
+            bottom: 25,
+            right: 25
           }
         }
       });
       
-      // Move navigation controls to bottom-right
+      // Add navigation controls to bottom-right with clear background
       view.when(() => {
         console.log('ArcGIS SceneView loaded successfully');
         console.log('Current basemap:', map.basemap?.id);
         
-        // Force basemap refresh if needed
-        map.basemap = map.basemap;
+        // Create custom zoom widget with improved visibility
+        const zoom = new Zoom({
+          view: view,
+          layout: "vertical"
+        });
         
-        // Explicitly position UI components to bottom-right
-        if (view.ui) {
-          // First remove the default position
-          view.ui.empty("top-left");
-          
-          // Then add navigation controls to bottom-right position
-          view.ui.move(["zoom", "compass"], "bottom-right");
-        }
+        // Create compass widget with improved visibility
+        const compass = new NavigationToggle({
+          view: view
+        });
+        
+        // Add widgets to bottom-right with clear spacing
+        view.ui.add(zoom, "bottom-right");
+        view.ui.add(compass, "bottom-right");
+        
+        // Improve visibility by adding CSS
+        const widgetContainer = document.createElement('style');
+        widgetContainer.textContent = `
+          .esri-widget {
+            background-color: rgba(255, 255, 255, 0.9) !important;
+            border: 1px solid rgba(0, 0, 0, 0.1) !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+          }
+          .esri-zoom .esri-widget--button {
+            background-color: white !important;
+            color: #333 !important;
+            font-weight: bold !important;
+          }
+          .esri-navigation-toggle {
+            background-color: white !important;
+          }
+          .esri-navigation-toggle__button {
+            color: #333 !important;
+          }
+        `;
+        document.head.appendChild(widgetContainer);
         
         setLoading(false);
         toast.success(`Map data loaded successfully with ${processedGeoJSON.features.length} hexagons!`);
