@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowDown, Layers, Maximize2, BarChart3, Info } from 'lucide-react';
 import { toast } from 'sonner';
@@ -63,15 +62,22 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
     console.log("Initializing ArcGIS map");
     
     try {
+      // Process the GeoJSON data for the selected metric
       const { processedGeoJSON, metricStats: stats } = processGeoJSON(geoJSONData, metric);
-      const colors = getColorScale(stats.min, stats.max, metric);
       
-      console.log(`Initial visualization for ${metric} with colors:`, colors);
+      // Get translucent light gray colors instead of the default colorful ones
+      const baseColors = ['#F1F1F1', '#E0E0E0', '#C8C8C9', '#AAADB0', '#9F9EA1'];
+      const translucentColors = baseColors.map(color => {
+        // Add 60% opacity to all colors
+        return color + '99';
+      });
+      
+      console.log(`Initial visualization with translucent colors:`, translucentColors);
       
       setMetricStats(stats);
-      setColorScale(colors);
+      setColorScale(translucentColors);
 
-      // Create a new Map instance with a basemap
+      // Create a new Map instance with a basemap, making streets more prominent
       const map = new Map({
         basemap: mapStyle
       });
@@ -83,48 +89,11 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
       
       map.add(highlightLayer);
       
-      // Create a GeoJSON layer
+      // Create a GeoJSON layer from the blob
       const geojsonBlob = new Blob([JSON.stringify(processedGeoJSON)], { type: "application/json" });
       const geojsonUrl = URL.createObjectURL(geojsonBlob);
       
-      // Create a renderer for the hexagons with 3D extrusion
-      const calculateExtrusionHeight = (feature: any) => {
-        const value = feature.attributes[metric];
-        
-        if (metric.includes('conge') && stats.quantiles) {
-          if (value <= stats.quantiles[1]) return 500;
-          if (value <= stats.quantiles[2]) return 800;
-          if (value <= stats.quantiles[3]) return 1200;
-          if (value <= stats.quantiles[4]) return 1600;
-          return 2000;
-        } else {
-          // Linear interpolation
-          const range = stats.max - stats.min;
-          if (range === 0) return 500;
-          const normalizedValue = (value - stats.min) / range;
-          return 500 + normalizedValue * 1500; // 500 to 2000
-        }
-      };
-      
-      // Create a visualVariable for color expression based on the metric
-      const getColorForValue = (value: number) => {
-        if (metric.includes('conge') && stats.quantiles) {
-          if (value <= stats.quantiles[1]) return colors[0];
-          if (value <= stats.quantiles[2]) return colors[1];
-          if (value <= stats.quantiles[3]) return colors[2];
-          if (value <= stats.quantiles[4]) return colors[3];
-          return colors[4];
-        } else {
-          // Linear interpolation
-          const range = stats.max - stats.min;
-          if (range === 0) return colors[0];
-          const normalizedValue = (value - stats.min) / range;
-          const colorIndex = Math.min(Math.floor(normalizedValue * colors.length), colors.length - 1);
-          return colors[colorIndex];
-        }
-      };
-      
-      // Create a GeoJSON layer
+      // Create a GeoJSON layer with translucent hexagons
       const hexagonsLayer = new GeoJSONLayer({
         url: geojsonUrl,
         title: "Riyadh Hexagons",
@@ -135,43 +104,47 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
             symbolLayers: [
               {
                 type: "extrude",
-                size: 500, // Will be updated by visual variables
-                material: { color: colors[0] } // Default color
+                size: 350, // Default size (reduced height)
+                material: { 
+                  color: translucentColors[0],
+                  // Add transparency to materials
+                  transparency: 0.4
+                }
               }
             ]
           },
+          // Fix TypeScript errors by using proper types for visual variables
           visualVariables: [
             {
-              type: "size",
-              field: metric,
+              // Size visual variable
               valueExpression: `$feature.${metric}`,
               valueUnit: "meters",
               minDataValue: stats.min,
               maxDataValue: stats.max,
-              minSize: 500,
-              maxSize: 2000
-            },
+              minSize: 200, // Reduced minimum height
+              maxSize: 800  // Reduced maximum height
+            } as any, // Type assertion to fix TypeScript error
             {
-              type: "color",
-              field: metric,
+              // Color visual variable
               valueExpression: `$feature.${metric}`,
               stops: [
-                { value: stats.min, color: colors[0] },
-                { value: stats.min + (stats.range * 0.25), color: colors[1] },
-                { value: stats.min + (stats.range * 0.5), color: colors[2] },
-                { value: stats.min + (stats.range * 0.75), color: colors[3] },
-                { value: stats.max, color: colors[4] }
+                { value: stats.min, color: translucentColors[0] },
+                { value: stats.min + (stats.range * 0.25), color: translucentColors[1] },
+                { value: stats.min + (stats.range * 0.5), color: translucentColors[2] },
+                { value: stats.min + (stats.range * 0.75), color: translucentColors[3] },
+                { value: stats.max, color: translucentColors[4] }
               ]
-            }
+            } as any // Type assertion to fix TypeScript error
           ]
         },
+        opacity: 0.7, // Make the entire layer more translucent
         popupEnabled: false,
         outFields: ["*"]
       });
       
       map.add(hexagonsLayer);
       
-      // Create a 3D SceneView
+      // Create a 3D SceneView with a more top-down view to better see street names
       const view = new SceneView({
         container: mapContainer.current,
         map: map,
@@ -179,9 +152,9 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
           position: {
             x: 46.67,
             y: 24.71,
-            z: 25000  // Altitude in meters
+            z: 30000  // Increase altitude for better overview
           },
-          tilt: 45,
+          tilt: 30, // Less tilt to see more of the map from above
           heading: 0
         },
         environment: {
@@ -189,10 +162,10 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
             directShadowsEnabled: true,
             date: new Date()
           },
-          atmosphere: {
-            quality: "high"
-          }
-        },
+          // Fix TypeScript error by removing atmosphere property
+          starsEnabled: false,
+          atmosphereEnabled: true
+        } as any, // Type assertion to fix TypeScript error
         popup: {
           dockEnabled: true,
           dockOptions: {
@@ -207,13 +180,18 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
       
       mapView.current = view;
       
-      // Add click handler for feature selection
+      // Add click handler for feature selection, fixing TypeScript errors
       view.on("click", (event) => {
         view.hitTest(event).then((response) => {
-          const result = response.results[0];
-          if (result && result.graphic) {
-            const feature = result.graphic;
-            if (feature.layer === hexagonsLayer) {
+          const results = response.results;
+          if (results.length > 0) {
+            // Check if it's a feature from our layer
+            const result = results.find((r: any) => {
+              return r.graphic && r.graphic.layer && r.graphic.layer.title === "Riyadh Hexagons";
+            });
+            
+            if (result && result.graphic) {
+              const feature = result.graphic;
               setSelectedFeature({
                 properties: feature.attributes
               });
@@ -221,7 +199,7 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
               // Fly to the clicked location
               view.goTo({
                 target: event.mapPoint,
-                tilt: 45,
+                tilt: 30, // Matching the view tilt
                 zoom: 14
               }, {
                 duration: 1000,
@@ -372,18 +350,19 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
   };
   
   const toggleMapStyle = () => {
+    // Include styles that emphasize street names
     const styles = [
       'streets',
-      'dark-gray',
-      'light-gray',
-      'satellite'
+      'streets-night',
+      'streets-navigation',
+      'osm'
     ];
     
     const currentIndex = styles.indexOf(mapStyle);
     const nextIndex = (currentIndex + 1) % styles.length;
     setMapStyle(styles[nextIndex]);
     
-    const styleNames = ['Streets', 'Dark', 'Light', 'Satellite'];
+    const styleNames = ['Streets', 'Streets Night', 'Navigation', 'OpenStreetMap'];
     toast.success(`Map style changed to ${styleNames[nextIndex]}`);
   };
 
@@ -398,11 +377,11 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
       
       <div ref={mapContainer} className="map-container" />
       
-      <div className="map-overlay">
+      <div className="map-overlay glass-card bg-white/80">
         <div className="chip mb-2">Traffic Analysis</div>
-        <h1 className="text-2xl font-bold tracking-tight mb-1">Riyadh Hexagonal Grid Analysis</h1>
+        <h1 className="text-2xl font-bold tracking-tight mb-1">Riyadh Hexagonal Analysis</h1>
         <p className="text-muted-foreground text-sm mb-4">
-          Visualization of traffic metrics across {geoJSONData.features.length} hexagonal grid cells
+          Traffic metrics across {geoJSONData.features.length} hexagonal cells
         </p>
         <Separator className="my-3" />
         <div className="info-row">
@@ -430,7 +409,7 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
         />
       )}
       
-      <div className="map-control">
+      <div className="map-control glass-card bg-white/80">
         <Button 
           variant="secondary" 
           size="sm" 

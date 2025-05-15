@@ -90,11 +90,9 @@
   top: 30px;
   left: 30px;
   padding: 15px 20px;
-  background-color: rgba(255, 255, 255, 0.9);
   border-radius: 0.5rem;
   max-width: 300px;
   z-index: 20;
-  backdrop-filter: blur(10px);
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
@@ -204,4 +202,20 @@
 
 .esri-view-surface--inset-outline:focus::after {
   outline: none !important;
+}
+
+/* Enhanced label visibility */
+.esri-streets-labels {
+  font-weight: 600 !important;
+  text-shadow: 0 0 3px white, 0 0 3px white, 0 0 3px white !important;
+}
+
+/* Make sure hexagons don't obscure street labels */
+.esri-view-surface canvas {
+  mix-blend-mode: multiply;
+}
+
+/* Improve street labels visibility */
+.esri-component.esri-attribution {
+  background-color: rgba(255, 255, 255, 0.7) !important;
 }
