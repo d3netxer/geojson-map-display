@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowDown, Layers, Maximize2, BarChart3, Info } from 'lucide-react';
 import { toast } from 'sonner';
@@ -110,8 +109,8 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
                 size: 350, // Default size (reduced height)
                 material: { 
                   color: translucentColors[0],
-                  // Fix TypeScript error by using opacity instead of transparency
-                  opacity: 0.6
+                  // Fix TypeScript error by using transparency instead of opacity
+                  transparency: 0.4
                 }
               }
             ]
@@ -157,9 +156,9 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
           position: {
             x: 46.67,
             y: 24.71,
-            z: 20000  // Altitude for the camera position
+            z: 60000  // Increased altitude from 20000 to 60000 (zoomed out by ~3 levels)
           },
-          tilt: 45, // Changed from 15 to 45 degrees as requested
+          tilt: 45, // 45 degrees tilt as requested
           heading: 0
         },
         environment: {
