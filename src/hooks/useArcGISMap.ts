@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState } from 'react';
 import { toast } from '@/components/ui/use-toast';
 import { processGeoJSON } from '@/lib/mapUtils';
@@ -28,6 +27,7 @@ export const useArcGISMap = ({
   onFeatureSelect
 }: UseArcGISMapProps) => {
   const mapView = useRef<SceneView | null>(null);
+  const mapInitialized = useRef<boolean>(false);
   const [loading, setLoading] = useState(true);
   const [metricStats, setMetricStats] = useState<any>(null);
   const [colorScale, setColorScale] = useState<string[]>([]);
@@ -53,6 +53,11 @@ export const useArcGISMap = ({
     // Configure ESRI API
     if (apiKey) {
       esriConfig.apiKey = apiKey;
+    }
+    
+    // Only initialize the map once
+    if (mapInitialized.current) {
+      return;
     }
     
     console.log("Initializing ArcGIS map with basemap:", mapStyle);
@@ -159,9 +164,6 @@ export const useArcGISMap = ({
           tilt: 55, // 55 degrees tilt
           heading: 0
         },
-        constraints: {
-          // Fix TypeScript error - don't include rotationEnabled
-        },
         // Force the view to start at our specified center
         viewpoint: {
           targetGeometry: {
@@ -198,10 +200,12 @@ export const useArcGISMap = ({
       });
       
       mapView.current = view;
+      mapInitialized.current = true;
 
       return () => {
         if (mapView.current) {
           mapView.current.destroy();
+          mapInitialized.current = false;
         }
       };
     } catch (error) {
@@ -213,7 +217,7 @@ export const useArcGISMap = ({
       });
       setLoading(false);
     }
-  }, [apiKey, mapStyle, geoJSONData, metric]);
+  }, [apiKey, mapStyle]);
 
   const initializeView = (mapContainer: HTMLDivElement) => {
     if (!mapView.current) return;
@@ -327,10 +331,12 @@ export const useArcGISMap = ({
     });
   };
 
+  // Update the visualization when metric changes, but keep the map visible
   useEffect(() => {
     if (!mapView.current || !mapView.current.ready) return;
     
     try {
+      console.log(`Updating map visualization for metric: ${metric}`);
       const { metricStats: stats } = processGeoJSON(geoJSONData, metric);
       
       // Update colors based on the chosen metric
@@ -345,75 +351,86 @@ export const useArcGISMap = ({
         colors = ['#EDF8FB', '#B2E2E2', '#66C2A4', '#2CA25F', '#006D2C'];
       }
       
-      console.log(`Updating visualization for ${metric} with colors:`, colors);
+      console.log(`Color scheme for ${metric}:`, colors);
       
       setMetricStats(stats);
       setColorScale(colors);
+      
+      // First, preserve the current camera position before updating
+      const currentCamera = mapView.current.camera.clone();
       
       // Update the layer renderer with new metric
       const hexLayer = mapView.current.map.layers.find(layer => layer.title === "Riyadh Hexagons") as GeoJSONLayer;
       
       if (hexLayer) {
-        let visualVariables = [];
+        // Create a proper renderer object instead of directly modifying properties
+        const renderer = hexLayer.renderer.clone();
+        
+        // Update the visual variables with proper types
+        const visualVariables = [];
         
         if (metric.includes('conge') && stats.quantiles) {
           // Use steps for congestion
-          visualVariables = [
-            {
-              type: "size",
-              stops: [
-                { value: stats.quantiles[0], size: 500 },
-                { value: stats.quantiles[1], size: 1000 },
-                { value: stats.quantiles[2], size: 1500 },
-                { value: stats.quantiles[3], size: 2000 },
-                { value: stats.quantiles[4], size: 2500 }
-              ]
-            },
-            {
-              type: "color",
-              stops: [
-                { value: stats.quantiles[0], color: colors[0] },
-                { value: stats.quantiles[1], color: colors[1] },
-                { value: stats.quantiles[2], color: colors[2] },
-                { value: stats.quantiles[3], color: colors[3] },
-                { value: stats.quantiles[4], color: colors[4] }
-              ]
-            }
-          ];
+          visualVariables.push({
+            type: "size",
+            stops: [
+              { value: stats.quantiles[0], size: 500 },
+              { value: stats.quantiles[1], size: 1000 },
+              { value: stats.quantiles[2], size: 1500 },
+              { value: stats.quantiles[3], size: 2000 },
+              { value: stats.quantiles[4], size: 2500 }
+            ]
+          });
+          
+          visualVariables.push({
+            type: "color",
+            stops: [
+              { value: stats.quantiles[0], color: colors[0] },
+              { value: stats.quantiles[1], color: colors[1] },
+              { value: stats.quantiles[2], color: colors[2] },
+              { value: stats.quantiles[3], color: colors[3] },
+              { value: stats.quantiles[4], color: colors[4] }
+            ]
+          });
         } else {
           // Use interpolation for other metrics
-          visualVariables = [
-            {
-              type: "size",
-              field: metric,
-              valueExpression: `$feature.${metric}`,
-              valueUnit: "meters",
-              minDataValue: stats.min,
-              maxDataValue: stats.max,
-              minSize: 500,
-              maxSize: 2500  // Increased maximum height for more dramatic effect
-            },
-            {
-              type: "color",
-              field: metric,
-              valueExpression: `$feature.${metric}`,
-              stops: [
-                { value: stats.min, color: colors[0] },
-                { value: stats.min + (stats.range * 0.25), color: colors[1] },
-                { value: stats.min + (stats.range * 0.5), color: colors[2] },
-                { value: stats.min + (stats.range * 0.75), color: colors[3] },
-                { value: stats.max, color: colors[4] }
-              ]
-            }
-          ];
+          visualVariables.push({
+            type: "size",
+            valueExpression: `$feature.${metric}`,
+            valueUnit: "meters",
+            minDataValue: stats.min,
+            maxDataValue: stats.max,
+            minSize: 500,
+            maxSize: 2500  // Increased maximum height for more dramatic effect
+          });
+          
+          visualVariables.push({
+            type: "color",
+            valueExpression: `$feature.${metric}`,
+            stops: [
+              { value: stats.min, color: colors[0] },
+              { value: stats.min + (stats.range * 0.25), color: colors[1] },
+              { value: stats.min + (stats.range * 0.5), color: colors[2] },
+              { value: stats.min + (stats.range * 0.75), color: colors[3] },
+              { value: stats.max, color: colors[4] }
+            ]
+          });
         }
         
-        // Update the renderer
-        const renderer = hexLayer.renderer as any;
-        renderer.visualVariables = visualVariables;
+        // Update the renderer's visualVariables property
+        (renderer as any).visualVariables = visualVariables;
+        hexLayer.renderer = renderer;
         
-        // Refresh the layer
+        // Apply the renderer and refresh the layer
         hexLayer.refresh();
+        
+        // Restore the camera position after updating the renderer
+        mapView.current.goTo(currentCamera, {
+          duration: 0 // No animation to avoid flicker
+        }).catch(error => {
+          console.log("Camera position restore failed:", error);
+          // Even if restoring fails, the map should still be visible
+        });
       }
       
       toast({
@@ -422,12 +439,37 @@ export const useArcGISMap = ({
       });
     } catch (error) {
       console.error('Error updating metric:', error);
+      toast({
+        title: "Update Error",
+        description: "There was an error updating the visualization.",
+        variant: "destructive"
+      });
     }
-  }, [metric]);
+  }, [metric, geoJSONData]);
 
   const updateMapStyle = (style: string) => {
     if (!mapView.current || !mapView.current.ready) return;
-    mapView.current.map.basemap = style;
+    
+    try {
+      // Save camera position before changing basemap
+      const currentCamera = mapView.current.camera.clone();
+      
+      // Update the basemap
+      mapView.current.map.basemap = style;
+      
+      // Restore camera position after changing basemap
+      setTimeout(() => {
+        if (mapView.current) {
+          mapView.current.goTo(currentCamera, {
+            duration: 0
+          }).catch(error => {
+            console.log("Camera position restore failed after style change:", error);
+          });
+        }
+      }, 100);
+    } catch (error) {
+      console.error('Error updating map style:', error);
+    }
   };
 
   return {
