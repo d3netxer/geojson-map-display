@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowDown, Layers, Maximize2, BarChart3, Info } from 'lucide-react';
 import { toast } from 'sonner';
@@ -109,8 +110,8 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
                 size: 350, // Default size (reduced height)
                 material: { 
                   color: translucentColors[0],
-                  // Must use transparency (0-1) for ExtrudeSymbol3DLayerMaterialProperties
-                  transparency: 0.4
+                  // Fix TypeScript error by using opacity instead of transparency
+                  opacity: 0.6
                 }
               }
             ]
@@ -148,7 +149,7 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
       
       map.add(hexagonsLayer);
       
-      // Create a 3D SceneView with a more top-down view to better see street names
+      // Create a 3D SceneView with a 45-degree tilt view
       const view = new SceneView({
         container: mapContainer.current,
         map: map,
@@ -156,9 +157,9 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
           position: {
             x: 46.67,
             y: 24.71,
-            z: 20000  // Reduced altitude to see street basemap better
+            z: 20000  // Altitude for the camera position
           },
-          tilt: 15, // Less tilt to see more of the map from above
+          tilt: 45, // Changed from 15 to 45 degrees as requested
           heading: 0
         },
         environment: {
