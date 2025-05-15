@@ -4,7 +4,7 @@ import customGeoJSON from './customGeoJSON';
 
 // This is the environment variable check using Vite's import.meta.env
 // Set this to 'custom' in your development environment to use the custom GeoJSON
-const GEOJSON_SOURCE = import.meta.env.VITE_GEOJSON_SOURCE || 'default';
+const GEOJSON_SOURCE = import.meta.env.VITE_GEOJSON_SOURCE || 'custom';
 
 // Object containing all available datasets
 const datasets = {
@@ -38,7 +38,7 @@ const isWGS84 = (geojson: any): boolean => {
 // Function to get the active dataset based on environment configuration
 export const getActiveGeoJSON = () => {
   // Get the dataset based on the environment variable
-  const geoJSON = datasets[GEOJSON_SOURCE as keyof typeof datasets] || defaultGeoJSON;
+  const geoJSON = datasets[GEOJSON_SOURCE as keyof typeof datasets] || customGeoJSON;
   
   // Verify that the GeoJSON is in WGS84 format
   if (!isWGS84(geoJSON)) {

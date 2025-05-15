@@ -107,8 +107,8 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
                 size: 350, // Default size (reduced height)
                 material: { 
                   color: translucentColors[0],
-                  // Fix the TypeScript error by using opacity instead of transparency
-                  opacity: 0.6 
+                  // Use transparency (0-1) instead of opacity
+                  transparency: 0.4 
                 }
               }
             ]

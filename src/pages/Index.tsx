@@ -16,14 +16,14 @@ const Index = () => {
   const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(true);
   const [mapReady, setMapReady] = useState<boolean>(false);
   const [currentGeoJSON, setCurrentGeoJSON] = useState<any>(activeGeoJSON);
-  const [datasetSource, setDatasetSource] = useState<string>(import.meta.env.VITE_GEOJSON_SOURCE || 'default');
+  const [datasetSource, setDatasetSource] = useState<string>(import.meta.env.VITE_GEOJSON_SOURCE || 'custom');
 
   // When component mounts, check which dataset is active
   useEffect(() => {
-    const currentDataset = import.meta.env.VITE_GEOJSON_SOURCE || 'default';
+    const currentDataset = import.meta.env.VITE_GEOJSON_SOURCE || 'custom';
     setDatasetSource(currentDataset);
     
-    toast.info(`Using ${currentDataset} GeoJSON dataset in WGS84 format. To switch, set VITE_GEOJSON_SOURCE environment variable.`);
+    toast.info(`Using ${currentDataset} GeoJSON dataset in WGS84 format.`);
   }, []);
 
   const handleApiKeySubmit = () => {
@@ -41,19 +41,6 @@ const Index = () => {
     }, 100);
   };
 
-  // Switch between available datasets
-  const toggleDataset = () => {
-    const newDataset = datasetSource === 'default' ? 'custom' : 'default';
-    setMapReady(false);
-    
-    setTimeout(() => {
-      setDatasetSource(newDataset);
-      setCurrentGeoJSON(geoJSONDatasets[newDataset as keyof typeof geoJSONDatasets]);
-      setMapReady(true);
-      toast.success(`Switched to ${newDataset} dataset (${geoJSONDatasets[newDataset as keyof typeof geoJSONDatasets].features.length} features)`);
-    }, 100);
-  };
-
   return (
     <div className="relative min-h-screen bg-background antialiased">
       <Toaster position="top-right" richColors />
@@ -66,16 +53,6 @@ const Index = () => {
         onClick={() => setShowApiKeyModal(true)}
       >
         <Info size={20} />
-      </Button>
-      
-      {/* Dataset Toggle Button */}
-      <Button 
-        variant="secondary"
-        size="sm"
-        className="absolute top-4 left-4 z-50 bg-white/80 backdrop-blur-sm hover:bg-white/90"
-        onClick={toggleDataset}
-      >
-        {datasetSource === 'default' ? 'Switch to Custom Dataset' : 'Switch to Default Dataset'}
       </Button>
       
       {/* Map Component */}
@@ -114,7 +91,7 @@ const Index = () => {
               <div className="bg-muted p-2 rounded-md text-sm">
                 <p>Current: <span className="font-semibold">{datasetSource}</span> ({currentGeoJSON.features.length} features)</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  To switch datasets in development, set the <code>VITE_GEOJSON_SOURCE</code> environment variable to 'default' or 'custom'.
+                  Using custom GeoJSON dataset with {currentGeoJSON.features.length} features.
                 </p>
               </div>
             </div>
