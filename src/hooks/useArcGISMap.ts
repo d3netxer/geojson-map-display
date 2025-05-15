@@ -63,14 +63,27 @@ export const useArcGISMap = ({
     
     try {
       // Process the GeoJSON data for the selected metric
-      const { metricStats: stats } = processGeoJSON(geoJSONData, metric);
+      const { metricStats } = processGeoJSON(geoJSONData, metric);
+      
+      if (!metricStats) {
+        throw new Error("Failed to process GeoJSON data");
+      }
       
       // Get initial colors
       const initialColors = getInitialColorScheme();
       
       console.log(`Initial visualization with translucent colors:`, initialColors);
       
-      setMetricStats(stats);
+      // Fix TS errors by ensuring we have a complete MapStats object
+      const completeStats: MapStats = {
+        min: metricStats.min || 0,
+        max: metricStats.max || 1,
+        mean: metricStats.mean,
+        range: metricStats.range || 1,
+        quantiles: metricStats.quantiles || []
+      };
+      
+      setMetricStats(completeStats);
       setColorScale(initialColors);
 
       // Create a new Map instance
@@ -83,7 +96,7 @@ export const useArcGISMap = ({
       map.add(highlightLayer);
       
       // Create the hexagons layer
-      const hexLayer = createGeoJSONLayer(geoJSONData, metric, stats, initialColors);
+      const hexLayer = createGeoJSONLayer(geoJSONData, metric, completeStats, initialColors);
       mapState.current.hexLayer = hexLayer;
       map.add(hexLayer);
       
@@ -126,21 +139,34 @@ export const useArcGISMap = ({
     
     try {
       console.log(`Updating map visualization for metric: ${metric}`);
-      const { metricStats: stats } = processGeoJSON(geoJSONData, metric);
+      const { metricStats } = processGeoJSON(geoJSONData, metric);
+      
+      if (!metricStats) {
+        throw new Error("Failed to process GeoJSON data for metric update");
+      }
+      
+      // Fix TS errors by ensuring we have a complete MapStats object
+      const completeStats: MapStats = {
+        min: metricStats.min || 0,
+        max: metricStats.max || 1,
+        mean: metricStats.mean,
+        range: metricStats.range || 1,
+        quantiles: metricStats.quantiles || []
+      };
       
       // Get color scheme for the metric
       const colors = getColorScheme(metric);
       console.log(`Color scheme for ${metric}:`, colors);
       
       // Update state
-      setMetricStats(stats);
+      setMetricStats(completeStats);
       setColorScale(colors);
       
       // Save current camera position
       const currentCamera = mapState.current.view.camera.clone();
       
       // Update the layer visualization
-      updateLayerVisualization(mapState.current.hexLayer, metric, stats, colors);
+      updateLayerVisualization(mapState.current.hexLayer, metric, completeStats, colors);
       
       // Restore camera position
       mapState.current.view.goTo(currentCamera, {

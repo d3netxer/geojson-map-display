@@ -11,17 +11,30 @@ import { Info } from 'lucide-react';
 // Import the GeoJSON manager
 import activeGeoJSON, { getActiveGeoJSON, geoJSONDatasets } from '../data/geoJSONManager';
 
+// Local storage key for API key
+const API_KEY_STORAGE_KEY = 'arcgis_api_key';
+
 const Index = () => {
   const [apiKey, setApiKey] = useState<string>('');
-  const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(true);
+  const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
   const [mapReady, setMapReady] = useState<boolean>(false);
   const [currentGeoJSON, setCurrentGeoJSON] = useState<any>(activeGeoJSON);
   const [datasetSource, setDatasetSource] = useState<string>(import.meta.env.VITE_GEOJSON_SOURCE || 'custom');
 
-  // When component mounts, check which dataset is active
+  // When component mounts, check which dataset is active and load API key from storage
   useEffect(() => {
     const currentDataset = import.meta.env.VITE_GEOJSON_SOURCE || 'custom';
     setDatasetSource(currentDataset);
+    
+    // Load API key from localStorage if available
+    const storedApiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
+    if (storedApiKey) {
+      setApiKey(storedApiKey);
+      setMapReady(true);
+    } else {
+      // Only show the API key dialog if we don't have one stored
+      setShowApiKeyModal(true);
+    }
     
     toast.info(`Using ${currentDataset} GeoJSON dataset in WGS84 format.`);
   }, []);
@@ -32,12 +45,15 @@ const Index = () => {
       return;
     }
     
+    // Store API key in localStorage
+    localStorage.setItem(API_KEY_STORAGE_KEY, apiKey);
+    
     setMapReady(false);
     // Brief timeout to allow the map to re-initialize with the new API key
     setTimeout(() => {
       setMapReady(true);
       setShowApiKeyModal(false);
-      toast.success('ArcGIS API key applied successfully');
+      toast.success('ArcGIS API key applied and saved for future sessions');
     }, 100);
   };
 
@@ -65,6 +81,7 @@ const Index = () => {
             <DialogTitle>ArcGIS Map Configuration</DialogTitle>
             <DialogDescription>
               This application uses ArcGIS to visualize geospatial data. You need to provide an ArcGIS API key to continue.
+              {localStorage.getItem(API_KEY_STORAGE_KEY) ? " Your API key will be saved for future sessions." : ""}
             </DialogDescription>
           </DialogHeader>
           
@@ -81,6 +98,7 @@ const Index = () => {
               />
               <p className="text-xs text-muted-foreground">
                 You need an ArcGIS API key to use this application. You can get one from the ArcGIS Developer portal.
+                Your API key will be saved locally on your device for convenience.
               </p>
             </div>
             
