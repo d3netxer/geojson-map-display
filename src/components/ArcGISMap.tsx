@@ -109,8 +109,7 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
                 size: 350, // Default size (reduced height)
                 material: { 
                   color: translucentColors[0],
-                  // Fixed TypeScript error - ArcGIS 3D symbols use transparency, not opacity
-                  transparency: 0.4
+                  // Fixed TypeScript error - ArcGIS 3D symbols don't use transparency or opacity directly
                 }
               }
             ]
@@ -148,16 +147,15 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
       
       map.add(hexagonsLayer);
       
-      // Create a 3D SceneView with a 55-degree tilt view centered 10km south of Riyadh center
+      // Create a 3D SceneView with a 55-degree tilt view centered at the specific coordinates provided
       const view = new SceneView({
         container: mapContainer.current,
         map: map,
         camera: {
           position: {
-            // Center of Riyadh coordinates (longitude, latitude) with 10km shift south
-            // Note: ~0.09 degrees latitude = approximately 10km
-            x: 46.72, // Longitude of central Riyadh
-            y: 24.60, // Latitude shifted ~10km south (24.69 - 0.09)
+            // Specific coordinates provided: 24.5979086, 46.7319571
+            x: 46.7319571, // Longitude (exact coordinate provided)
+            y: 24.5979086, // Latitude (exact coordinate provided)
             z: 60000  // Keep the same altitude for the zoomed out view
           },
           tilt: 55, // 55 degrees tilt
