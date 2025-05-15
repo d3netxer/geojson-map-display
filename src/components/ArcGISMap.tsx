@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowDown, Layers, Maximize2, BarChart3, Info } from 'lucide-react';
 import { toast } from 'sonner';
@@ -167,8 +168,7 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
           heading: 0
         },
         constraints: {
-          // Add constraints to make the camera behavior more predictable
-          snapToZoom: false,
+          // Fix TypeScript error - remove unsupported snapToZoom property
           rotationEnabled: true
         },
         // Force the view to start at our specified center
