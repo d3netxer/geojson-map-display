@@ -60,8 +60,13 @@ export const getColorScale = (min: number, max: number, metric: string) => {
   }
 };
 
-// Function to format metric values for display
-export const formatValue = (value: number, metric: string) => {
+// Function to format metric values for display with safe handling for undefined/null
+export const formatValue = (value: number | undefined | null, metric: string) => {
+  // Return placeholder if value is undefined or null
+  if (value === undefined || value === null) {
+    return 'N/A';
+  }
+
   if (metric === 'mean_speed') {
     return `${value.toFixed(1)} km/h`;
   } else if (metric === 'mean_conge') {

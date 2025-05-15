@@ -15,8 +15,9 @@ const MapLegend: React.FC<MapLegendProps> = ({ title, min, max, colorScale, metr
   // Calculate legend values based on quantiles or even distribution
   let legendValues: number[];
   
-  if (metric.includes('conge') && quantiles) {
-    legendValues = quantiles;
+  if (metric.includes('conge') && quantiles && quantiles.length >= 4) {
+    // Make sure quantiles array has values before using it
+    legendValues = [min, ...quantiles, max];
   } else {
     // Calculate intermediate values for the legend with even distribution
     const range = max - min;
@@ -29,6 +30,19 @@ const MapLegend: React.FC<MapLegendProps> = ({ title, min, max, colorScale, metr
       min + (step * 3),
       max
     ];
+  }
+  
+  // Ensure we have the correct number of legend values to match colorScale
+  if (legendValues.length !== colorScale.length) {
+    // Adjust legendValues to match colorScale length
+    const adjustedValues: number[] = [];
+    const range = max - min;
+    
+    for (let i = 0; i < colorScale.length; i++) {
+      adjustedValues.push(min + (range * (i / (colorScale.length - 1))));
+    }
+    
+    legendValues = adjustedValues;
   }
   
   return (
