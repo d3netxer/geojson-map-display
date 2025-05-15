@@ -107,8 +107,8 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
                 size: 350, // Default size (reduced height)
                 material: { 
                   color: translucentColors[0],
-                  // Use transparency (0-1) instead of opacity
-                  transparency: 0.4 
+                  // Fix TypeScript error by using opacity instead
+                  opacity: 0.6
                 }
               }
             ]
@@ -175,17 +175,30 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
           }
         },
         ui: {
-          components: ["zoom", "compass", "attribution"]
+          components: ["zoom", "compass", "attribution"],
+          padding: {
+            bottom: 15,
+            right: 15
+          }
         }
       });
       
-      // Fix to ensure basemap is loaded first before adding layers
+      // Move navigation controls to bottom-right
       view.when(() => {
         console.log('ArcGIS SceneView loaded successfully');
         console.log('Current basemap:', map.basemap?.id);
         
         // Force basemap refresh if needed
         map.basemap = map.basemap;
+        
+        // Explicitly position UI components to bottom-right
+        if (view.ui) {
+          // First remove the default position
+          view.ui.empty("top-left");
+          
+          // Then add navigation controls to bottom-right position
+          view.ui.move(["zoom", "compass"], "bottom-right");
+        }
         
         setLoading(false);
         toast.success(`Map data loaded successfully with ${processedGeoJSON.features.length} hexagons!`);
@@ -238,7 +251,7 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
         mapView.current.destroy();
       }
     };
-  }, [token, mapStyle, geoJSONData]);
+  }, [token, mapStyle, geoJSONData, metric]);
   
   useEffect(() => {
     if (!mapView.current || !mapView.current.ready) return;
