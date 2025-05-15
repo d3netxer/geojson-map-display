@@ -1,11 +1,10 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowDown, Layers, Maximize2, BarChart3, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
-import { processGeoJSON, getColorScale, formatValue } from '@/lib/mapUtils';
+import { processGeoJSON, getColorScale, formatValue, getHeightMultiplier } from '@/lib/mapUtils';
 import MapLegend from './MapLegend';
 
 // ESRI imports
@@ -108,8 +107,8 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
                 size: 350, // Default size (reduced height)
                 material: { 
                   color: translucentColors[0],
-                  // Fix the TypeScript error by using transparency instead of opacity
-                  transparency: 0.4 
+                  // Fix the TypeScript error by using opacity instead of transparency
+                  opacity: 0.6 
                 }
               }
             ]
@@ -117,16 +116,18 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
           // Fix TypeScript errors by using proper types for visual variables
           visualVariables: [
             {
-              // Size visual variable
+              // Size visual variable - now varies with the data value
+              type: "size",
               valueExpression: `$feature.${metric}`,
               valueUnit: "meters",
               minDataValue: stats.min,
               maxDataValue: stats.max,
-              minSize: 200, // Reduced minimum height
-              maxSize: 800  // Reduced maximum height
+              minSize: 200, // Smaller values get lower height
+              maxSize: 1500  // Larger values get taller height
             } as any, // Type assertion to fix TypeScript error
             {
               // Color visual variable
+              type: "color",
               valueExpression: `$feature.${metric}`,
               stops: [
                 { value: stats.min, color: translucentColors[0] },
@@ -264,10 +265,10 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
               type: "size",
               stops: [
                 { value: stats.quantiles[0], size: 500 },
-                { value: stats.quantiles[1], size: 800 },
-                { value: stats.quantiles[2], size: 1200 },
-                { value: stats.quantiles[3], size: 1600 },
-                { value: stats.quantiles[4], size: 2000 }
+                { value: stats.quantiles[1], size: 1000 },
+                { value: stats.quantiles[2], size: 1500 },
+                { value: stats.quantiles[3], size: 2000 },
+                { value: stats.quantiles[4], size: 2500 }
               ]
             },
             {
@@ -292,7 +293,7 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
               minDataValue: stats.min,
               maxDataValue: stats.max,
               minSize: 500,
-              maxSize: 2000
+              maxSize: 2500  // Increased maximum height for more dramatic effect
             },
             {
               type: "color",
