@@ -147,19 +147,39 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
       
       map.add(hexagonsLayer);
       
-      // Create a 3D SceneView with a 55-degree tilt view centered at the specific coordinates provided
+      // Define target coordinates - explicit use of longitude and latitude
+      const targetLongitude = 46.7319571; // Longitude
+      const targetLatitude = 24.5979086;  // Latitude
+      
+      // Create a 3D SceneView with a 55-degree tilt view centered at the specific coordinates
       const view = new SceneView({
         container: mapContainer.current,
         map: map,
+        center: [targetLongitude, targetLatitude], // Set center explicitly
+        zoom: 12, // Set an appropriate zoom level
         camera: {
           position: {
-            // Specific coordinates provided: 24.5979086, 46.7319571
-            x: 46.7319571, // Longitude (exact coordinate provided)
-            y: 24.5979086, // Latitude (exact coordinate provided)
-            z: 60000  // Keep the same altitude for the zoomed out view
+            x: targetLongitude, // Longitude
+            y: targetLatitude,  // Latitude
+            z: 15000  // Lower altitude for better initial view
           },
           tilt: 55, // 55 degrees tilt
           heading: 0
+        },
+        constraints: {
+          // Add constraints to make the camera behavior more predictable
+          snapToZoom: false,
+          rotationEnabled: true
+        },
+        // Force the view to start at our specified center
+        viewpoint: {
+          targetGeometry: {
+            type: "point",
+            x: targetLongitude,
+            y: targetLatitude,
+            spatialReference: { wkid: 4326 } // WGS84
+          },
+          scale: 50000 // Set an appropriate scale
         },
         environment: {
           lighting: {
@@ -190,6 +210,8 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
       view.when(() => {
         console.log('ArcGIS SceneView loaded successfully');
         console.log('Current basemap:', map.basemap?.id);
+        console.log('View center:', view.center);
+        console.log('Camera position:', view.camera.position);
         
         // Create custom zoom widget with improved visibility
         const zoom = new Zoom({
@@ -205,6 +227,17 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
         // Add widgets to bottom-right with clear spacing
         view.ui.add(zoom, "bottom-right");
         view.ui.add(compass, "bottom-right");
+        
+        // Force center the view at the target coordinates
+        view.goTo({
+          center: [targetLongitude, targetLatitude],
+          zoom: 12,
+          tilt: 55
+        }, {
+          duration: 0 // No animation for initial centering
+        }).catch((error) => {
+          console.error("View navigation failed:", error);
+        });
         
         // Improve visibility by adding CSS
         const widgetContainer = document.createElement('style');
@@ -229,7 +262,8 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
         document.head.appendChild(widgetContainer);
         
         setLoading(false);
-        toast.success(`Map data loaded successfully with ${processedGeoJSON.features.length} hexagons!`);
+        toast.success(`Map centered at ${targetLatitude.toFixed(4)}, ${targetLongitude.toFixed(4)}`);
+        toast.success(`Map data loaded with ${processedGeoJSON.features.length} hexagons!`);
       });
       
       mapView.current = view;
