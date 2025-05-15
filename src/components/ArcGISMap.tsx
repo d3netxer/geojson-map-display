@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowDown, Layers, Maximize2, BarChart3, Info } from 'lucide-react';
 import { toast } from 'sonner';
@@ -79,7 +80,7 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
 
       // Create a new Map instance with a basemap, making streets more prominent
       const map = new Map({
-        basemap: mapStyle
+        basemap: "streets" // Explicitly set to "streets" basemap
       });
 
       // Create a graphics layer to hold selected features
@@ -107,8 +108,8 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
                 size: 350, // Default size (reduced height)
                 material: { 
                   color: translucentColors[0],
-                  // Add transparency to materials
-                  transparency: 0.4
+                  // Use opacity instead of transparency for TypeScript compatibility
+                  opacity: 0.6
                 }
               }
             ]
@@ -180,31 +181,35 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
       
       mapView.current = view;
       
-      // Add click handler for feature selection, fixing TypeScript errors
+      // Fix the TypeScript error in the click handler
       view.on("click", (event) => {
         view.hitTest(event).then((response) => {
           const results = response.results;
           if (results.length > 0) {
             // Check if it's a feature from our layer
             const result = results.find((r: any) => {
-              return r.graphic && r.graphic.layer && r.graphic.layer.title === "Riyadh Hexagons";
+              // We need to use type assertion here due to ESRI API typing issues
+              return r.layer && r.layer.title === "Riyadh Hexagons";
             });
             
-            if (result && result.graphic) {
-              const feature = result.graphic;
-              setSelectedFeature({
-                properties: feature.attributes
-              });
-              
-              // Fly to the clicked location
-              view.goTo({
-                target: event.mapPoint,
-                tilt: 30, // Matching the view tilt
-                zoom: 14
-              }, {
-                duration: 1000,
-                easing: "ease-out"
-              });
+            if (result && result.layer) {
+              // Use type assertion to access graphic property
+              const feature = (result as any).graphic;
+              if (feature && feature.attributes) {
+                setSelectedFeature({
+                  properties: feature.attributes
+                });
+                
+                // Fly to the clicked location
+                view.goTo({
+                  target: event.mapPoint,
+                  tilt: 30, // Matching the view tilt
+                  zoom: 14
+                }, {
+                  duration: 1000,
+                  easing: "ease-out"
+                });
+              }
             }
           }
         });
