@@ -5,7 +5,6 @@ import GeoJSONLayer from '@arcgis/core/layers/GeoJSONLayer';
 
 export const getColorScheme = (metric: string): string[] => {
   if (metric.includes('conge')) {
-    // Enhanced color contrast for congestion
     return ['#E5F5E0', '#C0E5C8', '#86C49D', '#41A275', '#006C4A'];
   } else if (metric.includes('speed')) {
     return ['#FEE5D9', '#FCBBA1', '#FC9272', '#FB6A4A', '#DE2D26'];
@@ -35,10 +34,6 @@ export const createGeoJSONLayer = (
   const geojsonBlob = new Blob([JSON.stringify(processedGeoJSON)], { type: "application/json" });
   const geojsonUrl = URL.createObjectURL(geojsonBlob);
   
-  // Base height for visualization
-  const baseHeight = metric.includes('conge') ? 500 : 350;
-  const maxHeight = metric.includes('conge') ? 3000 : 1500;
-  
   // Create and return the GeoJSON layer
   return new GeoJSONLayer({
     url: geojsonUrl,
@@ -50,7 +45,7 @@ export const createGeoJSONLayer = (
         symbolLayers: [
           {
             type: "extrude",
-            size: baseHeight,
+            size: 350,
             material: { 
               color: colors[0],
             }
@@ -64,8 +59,8 @@ export const createGeoJSONLayer = (
           valueUnit: "meters",
           minDataValue: stats.min,
           maxDataValue: stats.max,
-          minSize: baseHeight,
-          maxSize: maxHeight
+          minSize: 200,
+          maxSize: 1500
         } as any,
         {
           type: "color",
@@ -80,7 +75,7 @@ export const createGeoJSONLayer = (
         } as any
       ]
     },
-    opacity: 0.8, // Increased opacity for better visibility
+    opacity: 0.7,
     popupEnabled: false,
     outFields: ["*"]
   });
@@ -97,36 +92,30 @@ export const updateLayerVisualization = (
   // Create a proper renderer object
   const renderer = layer.renderer.clone();
   
-  // Adjust base height based on metric
-  const baseHeight = metric.includes('conge') ? 500 : 500;
-  const maxHeight = metric.includes('conge') ? 3000 : 2000;
-  
   // Update the visual variables
   const visualVariables = [];
   
-  if (metric === 'mean_conge' && stats.quantiles) {
-    // Use steps for congestion with better visibility
+  if (metric.includes('conge') && stats.quantiles) {
+    // Use steps for congestion
     visualVariables.push({
       type: "size",
-      valueExpression: `$feature.${metric}`,
       stops: [
-        { value: stats.min, size: 500 },
+        { value: stats.quantiles[0], size: 500 },
         { value: stats.quantiles[1], size: 1000 },
         { value: stats.quantiles[2], size: 1500 },
-        { value: stats.quantiles[3], size: 2500 },
-        { value: stats.max, size: 3000 }
+        { value: stats.quantiles[3], size: 2000 },
+        { value: stats.quantiles[4], size: 2500 }
       ]
     });
     
     visualVariables.push({
       type: "color",
-      valueExpression: `$feature.${metric}`,
       stops: [
-        { value: stats.min, color: colors[0] },
+        { value: stats.quantiles[0], color: colors[0] },
         { value: stats.quantiles[1], color: colors[1] },
         { value: stats.quantiles[2], color: colors[2] },
         { value: stats.quantiles[3], color: colors[3] },
-        { value: stats.max, color: colors[4] }
+        { value: stats.quantiles[4], color: colors[4] }
       ]
     });
   } else {
@@ -137,8 +126,8 @@ export const updateLayerVisualization = (
       valueUnit: "meters",
       minDataValue: stats.min,
       maxDataValue: stats.max,
-      minSize: baseHeight,
-      maxSize: maxHeight
+      minSize: 500,
+      maxSize: 2500
     });
     
     visualVariables.push({
@@ -157,13 +146,6 @@ export const updateLayerVisualization = (
   // Update the renderer
   (renderer as any).visualVariables = visualVariables;
   layer.renderer = renderer;
-  
-  // Update the layer's opacity for better visibility
-  if (metric === 'mean_conge') {
-    layer.opacity = 0.85; // Higher opacity for congestion
-  } else {
-    layer.opacity = 0.7;  // Default opacity
-  }
   
   // Refresh the layer
   layer.refresh();
