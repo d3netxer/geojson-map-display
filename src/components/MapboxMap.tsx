@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { ArrowDown, Layers, Maximize2, BarChart3, Info } from 'lucide-react';
@@ -129,23 +128,28 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onError }) =
         
         // For congestion, use a step function with quantiles
         if (metric.includes('conge') && stats.quantiles) {
+          // Ensure quantiles are in ascending order for the step expression
+          const sortedQuantiles = [...stats.quantiles].sort((a, b) => a - b);
+          
           colorExpression = [
             'step',
             ['get', metric],
             colors[0],
-            stats.quantiles[1], colors[1],
-            stats.quantiles[2], colors[2],
-            stats.quantiles[3], colors[3],
-            stats.max, colors[4]
+            sortedQuantiles[0], colors[1],
+            sortedQuantiles[1], colors[2],
+            sortedQuantiles[2], colors[3],
+            sortedQuantiles[3], colors[4]
           ];
           
+          // Make sure height values are in strictly ascending order
           heightExpression = [
-            'step',
+            'interpolate', // Use interpolate instead of step for smoother transitions
+            ['linear'],
             ['get', metric],
-            500,
-            stats.quantiles[1], 800,
-            stats.quantiles[2], 1200,
-            stats.quantiles[3], 1600,
+            stats.min, 500,
+            stats.min + (stats.range * 0.25), 800,
+            stats.min + (stats.range * 0.5), 1200,
+            stats.min + (stats.range * 0.75), 1600,
             stats.max, 2000
           ];
         } 
@@ -253,23 +257,28 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onError }) =
       let heightExpression;
       
       if (metric.includes('conge') && stats.quantiles) {
+        // Ensure quantiles are in ascending order
+        const sortedQuantiles = [...stats.quantiles].sort((a, b) => a - b);
+        
         colorExpression = [
           'step',
           ['get', metric],
           colors[0],
-          stats.quantiles[1], colors[1],
-          stats.quantiles[2], colors[2],
-          stats.quantiles[3], colors[3],
-          stats.max, colors[4]
+          sortedQuantiles[0], colors[1],
+          sortedQuantiles[1], colors[2],
+          sortedQuantiles[2], colors[3],
+          sortedQuantiles[3], colors[4]
         ];
         
+        // Use interpolate for height to avoid step expression errors
         heightExpression = [
-          'step',
+          'interpolate',
+          ['linear'],
           ['get', metric],
-          500,
-          stats.quantiles[1], 800,
-          stats.quantiles[2], 1200,
-          stats.quantiles[3], 1600,
+          stats.min, 500,
+          stats.min + (stats.range * 0.25), 800,
+          stats.min + (stats.range * 0.5), 1200,
+          stats.min + (stats.range * 0.75), 1600,
           stats.max, 2000
         ];
       } else {
@@ -393,8 +402,9 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onError }) =
         selectedFeature={selectedFeature}
       />
 
-      {/* Add some CSS */}
-      <style jsx>{`
+      {/* Add custom styles */}
+      <style>
+        {`
         .map-overlay {
           position: absolute;
           top: 20px;
@@ -461,7 +471,8 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onError }) =
           from { opacity: 0; transform: translateY(10px); }
           to { opacity: 1; transform: translateY(0); }
         }
-      `}</style>
+        `}
+      </style>
     </div>
   );
 };
