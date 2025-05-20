@@ -1,4 +1,3 @@
-
 import { toast } from '@/components/ui/use-toast';
 import { MapViewState } from './types';
 import esriConfig from '@arcgis/core/config';
@@ -16,9 +15,10 @@ export const RIYADH_COORDINATES = {
 
 export const validateAPIKey = (token: string): boolean => {
   if (!token || token.trim() === '') {
+    console.error("API Key validation failed: Empty or missing token");
     toast({
       title: "API Key Error",
-      description: "No API key provided",
+      description: "No valid API key provided. Please update your API key in settings.",
       variant: "destructive"
     });
     return false;
@@ -27,8 +27,32 @@ export const validateAPIKey = (token: string): boolean => {
 };
 
 export const configureEsriAPI = (apiKey: string): void => {
-  if (apiKey) {
-    esriConfig.apiKey = apiKey;
+  try {
+    // Set CORS enabled and handle assets loading for GitHub Pages
+    esriConfig.request.useIdentity = false;
+    esriConfig.request.timeout = 60000;
+    
+    // Check if we're on GitHub Pages and need to adjust asset paths
+    const isGitHubPages = window.location.hostname.includes('github.io');
+    if (isGitHubPages) {
+      console.log("GitHub Pages environment - configuring ArcGIS for deployed environment");
+      
+      // Ensure apiKey is set
+      if (apiKey) {
+        esriConfig.apiKey = apiKey;
+        console.log("ArcGIS API key configured successfully");
+      } else {
+        console.warn("No API key provided for ArcGIS");
+      }
+    } else {
+      // Local development environment
+      if (apiKey) {
+        esriConfig.apiKey = apiKey;
+      }
+    }
+  } catch (error) {
+    console.error("Error configuring ArcGIS API:", error);
+    throw new Error(`ArcGIS configuration failed: ${error}`);
   }
 };
 
@@ -98,54 +122,71 @@ export const setupMapView = (
   mapState: MapViewState, 
   onFeatureSelect: (feature: any) => void
 ): void => {
-  if (!mapState.view) return;
+  if (!mapState.view) {
+    console.error("Map view not initialized");
+    return;
+  }
 
-  // Set the container for the view
-  mapState.view.container = container;
-  mapState.view.map = mapState.map;
-  
-  // Add widgets and controls when view is ready
-  mapState.view.when(() => {
-    console.log('ArcGIS SceneView loaded successfully');
+  try {
+    console.log("Setting up map view with container");
     
-    if (!mapState.view) return;
+    // Set the container for the view
+    mapState.view.container = container;
+    mapState.view.map = mapState.map;
     
-    // Add zoom widget
-    const zoom = new Zoom({
-      view: mapState.view,
-      layout: "vertical"
-    });
-    
-    // Add compass widget
-    const compass = new NavigationToggle({
-      view: mapState.view
-    });
-    
-    // Position widgets
-    mapState.view.ui.add(zoom, "bottom-right");
-    mapState.view.ui.add(compass, "bottom-right");
-    
-    // Center the map on Riyadh
-    const { longitude, latitude } = RIYADH_COORDINATES;
-    mapState.view.goTo({
-      center: [longitude, latitude],
-      zoom: 12,
-      tilt: 55
-    }, {
-      duration: 0
+    // Add widgets and controls when view is ready
+    mapState.view.when(() => {
+      console.log('ArcGIS SceneView loaded successfully');
+      
+      if (!mapState.view) return;
+      
+      // Add zoom widget
+      const zoom = new Zoom({
+        view: mapState.view,
+        layout: "vertical"
+      });
+      
+      // Add compass widget
+      const compass = new NavigationToggle({
+        view: mapState.view
+      });
+      
+      // Position widgets
+      mapState.view.ui.add(zoom, "bottom-right");
+      mapState.view.ui.add(compass, "bottom-right");
+      
+      // Center the map on Riyadh
+      const { longitude, latitude } = RIYADH_COORDINATES;
+      mapState.view.goTo({
+        center: [longitude, latitude],
+        zoom: 12,
+        tilt: 55
+      }, {
+        duration: 0
+      }).catch(error => {
+        console.error("View navigation failed:", error);
+      });
+      
+      // Add CSS for better widget visibility
+      addWidgetStyles();
+      
+      // Setup click handler for feature selection
+      setupFeatureClickHandler(mapState, onFeatureSelect);
+      
+      // Show success toasts
+      showSuccessToasts(longitude, latitude);
     }).catch(error => {
-      console.error("View navigation failed:", error);
+      console.error("Error in map view initialization:", error);
+      toast({
+        title: "Map Initialization Failed",
+        description: `Error: ${error?.message || "Unknown error"}`,
+        variant: "destructive"
+      });
     });
-    
-    // Add CSS for better widget visibility
-    addWidgetStyles();
-    
-    // Setup click handler for feature selection
-    setupFeatureClickHandler(mapState, onFeatureSelect);
-    
-    // Show success toasts
-    showSuccessToasts(longitude, latitude);
-  });
+  } catch (error) {
+    console.error("Fatal error setting up map view:", error);
+    throw error;
+  }
 };
 
 const addWidgetStyles = (): void => {

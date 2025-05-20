@@ -1,3 +1,4 @@
+
 import { useEffect, useRef, useState } from 'react';
 import { toast } from '@/components/ui/use-toast';
 import { processGeoJSON } from '@/lib/mapUtils';
@@ -51,8 +52,30 @@ export const useArcGISMap = ({
       return;
     }
 
-    // Configure ESRI API
+    // Enhanced console log for debugging in production
+    console.log(`Initializing ArcGIS with API key: ${apiKey ? `${apiKey.substring(0, 5)}...` : 'missing'}`);
+    console.log(`Base path: ${window.location.origin}${window.location.pathname}`);
+    
+    // Configure ESRI API with enhanced error handling
     try {
+      // Set ArcGIS assets path explicitly for GitHub Pages
+      const isGitHubPages = window.location.hostname.includes('github.io');
+      if (isGitHubPages) {
+        // Explicitly set the assets path for GitHub Pages
+        console.log("GitHub Pages environment detected, configuring ArcGIS paths");
+        
+        // Import path setting function dynamically to avoid reference errors
+        import('@arcgis/core/config').then(esriConfig => {
+          // Set the asset path to the correct GitHub Pages URL
+          const basePath = `${window.location.origin}${window.location.pathname}`;
+          esriConfig.default.assetsPath = `${basePath}assets`;
+          console.log(`ArcGIS assets path set to: ${esriConfig.default.assetsPath}`);
+        }).catch(err => {
+          console.error("Failed to import esriConfig:", err);
+          setError("Failed to configure ArcGIS paths");
+        });
+      }
+      
       configureEsriAPI(apiKey);
     } catch (err) {
       console.error("Failed to configure ESRI API:", err);
