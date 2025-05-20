@@ -1,4 +1,3 @@
-
 import { processGeoJSON } from '@/lib/mapUtils';
 import { MapStats } from './types';
 import GeoJSONLayer from '@arcgis/core/layers/GeoJSONLayer';
@@ -122,86 +121,104 @@ export const updateLayerVisualization = (
 ): void => {
   if (!layer) return;
   
-  // Create a proper renderer object
-  const renderer = layer.renderer.clone();
-  
-  // Adjust base height based on metric - keeping consistent with createGeoJSONLayer
-  const baseHeight = metric.includes('conge') ? 1000 : 800;
-  const maxHeight = metric.includes('conge') ? 3000 : 2000;
-  
-  // Update the visual variables
-  const visualVariables = [];
-  
-  if (metric === 'mean_conge' && stats.quantiles) {
-    // Use steps for congestion with better visibility
-    visualVariables.push({
-      type: "size",
-      valueExpression: `$feature.${metric}`,
-      stops: [
-        { value: stats.min, size: 1000 },
-        { value: stats.quantiles[1], size: 1500 },
-        { value: stats.quantiles[2], size: 2000 },
-        { value: stats.quantiles[3], size: 2500 },
-        { value: stats.max, size: 3000 }
-      ]
-    });
+  try {
+    // Create a proper renderer object
+    const renderer = layer.renderer.clone();
     
-    visualVariables.push({
-      type: "color",
-      valueExpression: `$feature.${metric}`,
-      stops: [
-        { value: stats.min, color: colors[0] },
-        { value: stats.quantiles[1], color: colors[1] },
-        { value: stats.quantiles[2], color: colors[2] },
-        { value: stats.quantiles[3], color: colors[3] },
-        { value: stats.max, color: colors[4] }
-      ]
-    });
-  } else {
-    // Use interpolation for other metrics
-    visualVariables.push({
-      type: "size",
-      valueExpression: `$feature.${metric}`,
-      valueUnit: "meters",
-      minDataValue: stats.min,
-      maxDataValue: stats.max,
-      minSize: baseHeight,
-      maxSize: maxHeight
-    });
+    // Adjust base height based on metric - keeping consistent with createGeoJSONLayer
+    const baseHeight = metric.includes('conge') ? 1000 : 800;
+    const maxHeight = metric.includes('conge') ? 3000 : 2000;
     
-    visualVariables.push({
-      type: "color",
-      valueExpression: `$feature.${metric}`,
-      stops: [
-        { value: stats.min, color: colors[0] },
-        { value: stats.min + (stats.range * 0.25), color: colors[1] },
-        { value: stats.min + (stats.range * 0.5), color: colors[2] },
-        { value: stats.min + (stats.range * 0.75), color: colors[3] },
-        { value: stats.max, color: colors[4] }
-      ]
-    });
+    // Update the visual variables
+    const visualVariables = [];
+    
+    if (metric === 'mean_conge' && stats.quantiles) {
+      // Use steps for congestion with better visibility
+      visualVariables.push({
+        type: "size",
+        valueExpression: `$feature.${metric}`,
+        stops: [
+          { value: stats.min, size: 1000 },
+          { value: stats.quantiles[1], size: 1500 },
+          { value: stats.quantiles[2], size: 2000 },
+          { value: stats.quantiles[3], size: 2500 },
+          { value: stats.max, size: 3000 }
+        ]
+      });
+      
+      visualVariables.push({
+        type: "color",
+        valueExpression: `$feature.${metric}`,
+        stops: [
+          { value: stats.min, color: colors[0] },
+          { value: stats.quantiles[1], color: colors[1] },
+          { value: stats.quantiles[2], color: colors[2] },
+          { value: stats.quantiles[3], color: colors[3] },
+          { value: stats.max, color: colors[4] }
+        ]
+      });
+    } else {
+      // Use interpolation for other metrics
+      visualVariables.push({
+        type: "size",
+        valueExpression: `$feature.${metric}`,
+        valueUnit: "meters",
+        minDataValue: stats.min,
+        maxDataValue: stats.max,
+        minSize: baseHeight,
+        maxSize: maxHeight
+      });
+      
+      visualVariables.push({
+        type: "color",
+        valueExpression: `$feature.${metric}`,
+        stops: [
+          { value: stats.min, color: colors[0] },
+          { value: stats.min + (stats.range * 0.25), color: colors[1] },
+          { value: stats.min + (stats.range * 0.5), color: colors[2] },
+          { value: stats.min + (stats.range * 0.75), color: colors[3] },
+          { value: stats.max, color: colors[4] }
+        ]
+      });
+    }
+    
+    // Safely update the renderer with material transparency - completely rewritten for safety
+    try {
+      if (renderer) {
+        // Create a new symbol definition rather than modifying existing potentially undefined properties
+        const symbolConfig = {
+          type: "polygon-3d",
+          symbolLayers: [
+            {
+              type: "extrude",
+              size: baseHeight,
+              material: { 
+                color: colors[0],
+                transparency: 80 // 30% transparent (transparency is 0-100)
+              }
+            }
+          ]
+        };
+        
+        // Apply the new symbol
+        (renderer as any).symbol = symbolConfig;
+        
+        // Update the visualVariables
+        (renderer as any).visualVariables = visualVariables;
+        
+        // Set the renderer
+        layer.renderer = renderer;
+      }
+    } catch (err) {
+      console.error("Error updating symbol material:", err);
+    }
+    
+    // Update the layer's opacity
+    layer.opacity = 0.99;
+    
+    // Refresh the layer
+    layer.refresh();
+  } catch (err) {
+    console.error("Error in updateLayerVisualization:", err);
   }
-  
-  // Update the renderer with material transparency
-  // Fix for "Cannot set properties of undefined" error
-  if (
-    (renderer as any).symbol && 
-    (renderer as any).symbol.symbolLayers && 
-    (renderer as any).symbol.symbolLayers.length > 0
-  ) {
-    (renderer as any).symbol.symbolLayers[0].material = {
-      color: colors[0],
-      transparency: 80 // 30% transparent (transparency is 0-100)
-    };
-  }
-  
-  // Update the renderer
-  (renderer as any).visualVariables = visualVariables;
-  layer.renderer = renderer;
-  
-  // Update the layer's opacity
-  layer.opacity = 0.99;
-  
-  // Refresh the layer
-  layer.refresh();
 };
