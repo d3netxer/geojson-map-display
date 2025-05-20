@@ -101,7 +101,7 @@ export const createGeoJSONLayer = (
             material: { 
               color: colors[0],
               // Adjust material transparency
-              transparency: 30  // 30% transparent
+              transparency: 80  // 30% transparent
             }
           }
         ]
