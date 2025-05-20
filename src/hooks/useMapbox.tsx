@@ -207,23 +207,45 @@ export const useMapbox = ({
     let heightExpression;
     
     if (metric.includes('conge') && stats.quantiles) {
-      // Ensure quantiles are in ascending order and unique for step expression
-      const sortedQuantiles = [...stats.quantiles].sort((a, b) => a - b);
-      const uniqueSortedValues = Array.from(new Set(sortedQuantiles)).sort((a, b) => a - b);
+      // Fix: Ensure quantiles are in strictly ascending order and unique for step expression
+      let uniqueQuantiles = Array.from(new Set(stats.quantiles)).sort((a: number, b: number) => a - b);
       
-      // Create pairs of values and colors for the step expression
-      const stepPairs = [];
-      for (let i = 0; i < Math.min(uniqueSortedValues.length, colors.length - 1); i++) {
-        stepPairs.push(uniqueSortedValues[i], colors[i + 1]);
+      // Ensure the first value is greater than min (to avoid duplicate step values)
+      if (uniqueQuantiles[0] <= stats.min) {
+        uniqueQuantiles = uniqueQuantiles.filter((q: number) => q > stats.min);
       }
       
-      // Build the complete step expression with safe, ascending values
+      // Ensure quantiles have at least a small difference between them
+      const processedQuantiles: number[] = [];
+      let prevValue = stats.min;
+      
+      for (const q of uniqueQuantiles) {
+        // Add a small epsilon if the value is too close to previous
+        if (q - prevValue < 0.001) {
+          const adjustedValue = prevValue + 0.001;
+          processedQuantiles.push(adjustedValue);
+          prevValue = adjustedValue;
+        } else {
+          processedQuantiles.push(q);
+          prevValue = q;
+        }
+      }
+      
+      // Create step pairs ensuring strictly ascending order
+      const stepPairs = [];
+      for (let i = 0; i < Math.min(processedQuantiles.length, colors.length - 1); i++) {
+        stepPairs.push(processedQuantiles[i], colors[i + 1]);
+      }
+      
+      // Build the complete step expression with strictly ascending values
       colorExpression = [
         'step',
         ['get', metric],
         colors[0],
         ...stepPairs
       ];
+      
+      console.log('Step expression for color:', colorExpression);
       
       // Use interpolate for height to avoid step expression errors
       heightExpression = [

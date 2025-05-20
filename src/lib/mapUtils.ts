@@ -1,4 +1,3 @@
-
 // Function to process GeoJSON data for visualization
 export const processGeoJSON = (geojson: any, metric: string) => {
   if (!geojson || !geojson.features) {
@@ -29,13 +28,38 @@ export const processGeoJSON = (geojson: any, metric: string) => {
   const mean = values.reduce((a: number, b: number) => a + b, 0) / values.length;
 
   // Calculate quantiles for better visualization
+  // Sort values and ensure they're strictly ascending
   const sortedValues = [...values].sort((a, b) => a - b);
-  const quantiles = [
-    sortedValues[Math.floor(sortedValues.length * 0.2)],
-    sortedValues[Math.floor(sortedValues.length * 0.4)],
-    sortedValues[Math.floor(sortedValues.length * 0.6)],
-    sortedValues[Math.floor(sortedValues.length * 0.8)],
+  
+  // Ensure we have unique values for quantiles
+  const quantileIndices = [
+    Math.floor(sortedValues.length * 0.2),
+    Math.floor(sortedValues.length * 0.4),
+    Math.floor(sortedValues.length * 0.6),
+    Math.floor(sortedValues.length * 0.8),
   ];
+
+  // Get quantile values
+  const rawQuantiles = quantileIndices.map(index => sortedValues[index]);
+  
+  // Ensure quantiles are unique and strictly ascending
+  let prevValue = min;
+  const processedQuantiles = [];
+  
+  for (const q of rawQuantiles) {
+    // Skip if the same as previous or less than min
+    if (q > prevValue) {
+      processedQuantiles.push(q);
+      prevValue = q;
+    } else {
+      // Add a small increment to ensure ascending order
+      const adjustedValue = prevValue + 0.001;
+      processedQuantiles.push(adjustedValue);
+      prevValue = adjustedValue;
+    }
+  }
+
+  console.log(`Quantiles for ${metric}:`, processedQuantiles);
 
   // Return processed GeoJSON and statistics
   return {
@@ -45,7 +69,7 @@ export const processGeoJSON = (geojson: any, metric: string) => {
       max,
       mean,
       range,
-      quantiles
+      quantiles: processedQuantiles
     }
   };
 };
