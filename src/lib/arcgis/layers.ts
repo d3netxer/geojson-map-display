@@ -28,9 +28,9 @@ export const createGeoJSONLayer = (
   const geojsonBlob = new Blob([JSON.stringify(processedGeoJSON)], { type: "application/json" });
   const geojsonUrl = URL.createObjectURL(geojsonBlob);
   
-  // Base height for visualization
-  const baseHeight = metric.includes('conge') ? 500 : 350;
-  const maxHeight = metric.includes('conge') ? 3000 : 1500;
+  // Increase base height for better initial visualization
+  const baseHeight = metric.includes('conge') ? 1000 : 800;
+  const maxHeight = metric.includes('conge') ? 3000 : 2000;
   
   // Create and return the GeoJSON layer
   return new GeoJSONLayer({
@@ -73,7 +73,7 @@ export const createGeoJSONLayer = (
         } as any
       ]
     },
-    opacity: 0.8, // Increased opacity for better visibility
+    opacity: 0.85, // Increased opacity for better visibility
     popupEnabled: false,
     outFields: ["*"]
   });
@@ -90,8 +90,8 @@ export const updateLayerVisualization = (
   // Create a proper renderer object
   const renderer = layer.renderer.clone();
   
-  // Adjust base height based on metric
-  const baseHeight = metric.includes('conge') ? 500 : 500;
+  // Adjust base height based on metric - keeping consistent with createGeoJSONLayer
+  const baseHeight = metric.includes('conge') ? 1000 : 800;
   const maxHeight = metric.includes('conge') ? 3000 : 2000;
   
   // Update the visual variables
@@ -103,9 +103,9 @@ export const updateLayerVisualization = (
       type: "size",
       valueExpression: `$feature.${metric}`,
       stops: [
-        { value: stats.min, size: 500 },
-        { value: stats.quantiles[1], size: 1000 },
-        { value: stats.quantiles[2], size: 1500 },
+        { value: stats.min, size: 1000 },
+        { value: stats.quantiles[1], size: 1500 },
+        { value: stats.quantiles[2], size: 2000 },
         { value: stats.quantiles[3], size: 2500 },
         { value: stats.max, size: 3000 }
       ]
