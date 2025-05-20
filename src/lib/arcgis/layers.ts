@@ -1,4 +1,3 @@
-
 import { processGeoJSON } from '@/lib/mapUtils';
 import { MapStats } from './types';
 import GeoJSONLayer from '@arcgis/core/layers/GeoJSONLayer';
@@ -14,12 +13,6 @@ export const getColorScheme = (metric: string): string[] => {
   } else {
     return ['#EDF8FB', '#B2E2E2', '#66C2A4', '#2CA25F', '#006D2C'];
   }
-};
-
-export const getInitialColorScheme = (): string[] => {
-  // Translucent light gray colors for initial view
-  const baseColors = ['#F1F1F1', '#E0E0E0', '#C8C8C9', '#AAADB0', '#9F9EA1'];
-  return baseColors.map(color => `${color}99`); // Add 60% opacity
 };
 
 export const createGeoJSONLayer = (

@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState } from 'react';
 import { toast } from '@/components/ui/use-toast';
 import { processGeoJSON } from '@/lib/mapUtils';
@@ -19,8 +18,7 @@ import {
   setupMapView 
 } from '@/lib/arcgis/initMap';
 import { 
-  getColorScheme, 
-  getInitialColorScheme, 
+  getColorScheme,
   createGeoJSONLayer, 
   updateLayerVisualization 
 } from '@/lib/arcgis/layers';
@@ -78,10 +76,10 @@ export const useArcGISMap = ({
         throw new Error("Failed to process GeoJSON data");
       }
       
-      // Get initial colors
-      const initialColors = getInitialColorScheme();
+      // Get actual colors for the metric instead of initial translucent ones
+      const colors = getColorScheme(metric);
       
-      console.log(`Initial visualization with translucent colors:`, initialColors);
+      console.log(`Initial visualization with colors for ${metric}:`, colors);
       
       // Fix TS errors by ensuring we have a complete MapStats object
       const completeStats: MapStats = {
@@ -93,7 +91,7 @@ export const useArcGISMap = ({
       };
       
       setMetricStats(completeStats);
-      setColorScale(initialColors);
+      setColorScale(colors);
 
       // Create a new Map instance
       const map = createMap(mapStyle);
@@ -104,8 +102,8 @@ export const useArcGISMap = ({
       mapState.current.highlightLayer = highlightLayer;
       map.add(highlightLayer);
       
-      // Create the hexagons layer
-      const hexLayer = createGeoJSONLayer(geoJSONData, metric, completeStats, initialColors);
+      // Create the hexagons layer with actual colors
+      const hexLayer = createGeoJSONLayer(geoJSONData, metric, completeStats, colors);
       mapState.current.hexLayer = hexLayer;
       map.add(hexLayer);
       
