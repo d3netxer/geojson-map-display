@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { ArrowDown, Layers, Maximize2, BarChart3, Info } from 'lucide-react';
@@ -16,7 +17,7 @@ interface MapboxMapProps {
   onError?: (error: string) => void;
 }
 
-const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onError }) => {
+const MapboxMap = ({ apiKey, geoJSONData, onError }: MapboxMapProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [loading, setLoading] = useState(true);
