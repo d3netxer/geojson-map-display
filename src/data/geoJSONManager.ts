@@ -1,6 +1,7 @@
 
 import defaultGeoJSON from './defaultGeoJSON';
 import customGeoJSON from './customGeoJSON';
+import { optimizeGeoJSON } from './geoJSONOptimizer';
 
 // This is the environment variable check using Vite's import.meta.env
 // Set this to 'custom' in your development environment to use the custom GeoJSON
@@ -45,13 +46,14 @@ export const getActiveGeoJSON = () => {
     console.warn('The GeoJSON data is not in WGS84 format. This may cause rendering issues.');
   }
   
-  return geoJSON;
+  // Optimize the GeoJSON to reduce memory usage
+  return optimizeGeoJSON(geoJSON);
 };
 
 // Export all datasets for direct access if needed
 export const geoJSONDatasets = {
-  default: defaultGeoJSON,
-  custom: customGeoJSON
+  default: optimizeGeoJSON(defaultGeoJSON),
+  custom: optimizeGeoJSON(customGeoJSON)
 };
 
 // Default export is the active dataset
