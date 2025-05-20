@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { toast } from '@/components/ui/use-toast';
 import { useArcGISMap } from '@/hooks/useArcGISMap';
@@ -11,9 +12,10 @@ import '@arcgis/core/assets/esri/themes/light/main.css';
 interface ArcGISMapProps {
   apiKey?: string;
   geoJSONData: any;
+  onError?: (error: string) => void;
 }
 
-const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
+const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData, onError }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const [metric, setMetric] = useState<string>('mean_speed');
   const [selectedFeature, setSelectedFeature] = useState<any>(null);
@@ -27,7 +29,8 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
     metricStats, 
     colorScale, 
     initializeView,
-    updateMapStyle
+    updateMapStyle,
+    error
   } = useArcGISMap({
     apiKey: token,
     geoJSONData,
@@ -35,6 +38,13 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
     mapStyle,
     onFeatureSelect: setSelectedFeature
   });
+
+  // Report errors back to the parent component
+  useEffect(() => {
+    if (error && onError) {
+      onError(error);
+    }
+  }, [error, onError]);
   
   // Initialize view when the container is ready
   useEffect(() => {
@@ -96,16 +106,22 @@ const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData }) => {
     });
   };
 
+  if (error) {
+    return null; // Let the parent component handle errors
+  }
+
   return (
     <div className="relative w-full h-screen overflow-hidden bg-background">
       {loading && (
-        <div className="loading-container">
-          <div className="loading-spinner" />
-          <p className="mt-4 text-muted-foreground animate-pulse">Loading map visualization...</p>
+        <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-50">
+          <div className="flex flex-col items-center">
+            <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4" />
+            <p className="text-muted-foreground animate-pulse">Loading map visualization...</p>
+          </div>
         </div>
       )}
       
-      <div ref={mapContainer} className="map-container" />
+      <div ref={mapContainer} className="map-container w-full h-full" />
       
       {/* Map information overlay */}
       <MapInfoOverlay 

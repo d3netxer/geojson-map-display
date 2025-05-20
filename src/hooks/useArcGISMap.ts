@@ -31,7 +31,7 @@ export const useArcGISMap = ({
   metric,
   mapStyle,
   onFeatureSelect
-}: UseArcGISMapProps): UseArcGISMapReturn => {
+}: UseArcGISMapProps): UseArcGISMapReturn & { error: string | null } => {
   const mapState = useRef<MapViewState>({
     view: null,
     map: null,
@@ -43,16 +43,25 @@ export const useArcGISMap = ({
   const [loading, setLoading] = useState(true);
   const [metricStats, setMetricStats] = useState<MapStats | null>(null);
   const [colorScale, setColorScale] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   // Initialize the map
   useEffect(() => {
     if (!validateAPIKey(apiKey)) {
       setLoading(false);
+      setError("Invalid or missing API key");
       return;
     }
 
     // Configure ESRI API
-    configureEsriAPI(apiKey);
+    try {
+      configureEsriAPI(apiKey);
+    } catch (err) {
+      console.error("Failed to configure ESRI API:", err);
+      setLoading(false);
+      setError("Failed to initialize ArcGIS - API configuration error");
+      return;
+    }
     
     // Only initialize the map once
     if (mapState.current.initialized) {
@@ -107,6 +116,9 @@ export const useArcGISMap = ({
       
       // Mark as initialized
       mapState.current.initialized = true;
+      
+      // Clear any previous errors
+      setError(null);
 
       return () => {
         if (mapState.current.view) {
@@ -114,23 +126,29 @@ export const useArcGISMap = ({
           mapState.current.initialized = false;
         }
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Map initialization error:', error);
-      toast({
-        title: "Map Error",
-        description: "Failed to initialize map. Check your API key and network connection.",
-        variant: "destructive"
-      });
+      setError(`Failed to initialize map: ${error.message || 'Unknown error'}`);
       setLoading(false);
     }
   }, [apiKey, mapStyle]);
 
   // Initialize the view with a container
   const initializeView = (mapContainer: HTMLDivElement): void => {
-    if (!mapState.current.view) return;
+    if (!mapState.current.view) {
+      setError("Map view not initialized");
+      return;
+    }
     
-    setupMapView(mapContainer, mapState.current, onFeatureSelect);
-    setLoading(false);
+    try {
+      setupMapView(mapContainer, mapState.current, onFeatureSelect);
+      setLoading(false);
+      setError(null);
+    } catch (err: any) {
+      console.error("Error setting up map view:", err);
+      setError(`Error setting up map view: ${err.message || 'Unknown error'}`);
+      setLoading(false);
+    }
   };
 
   // Update visualization when metric changes
@@ -179,7 +197,7 @@ export const useArcGISMap = ({
         title: "Metric Updated",
         description: `Visualizing: ${metric}`
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating metric:', error);
       toast({
         title: "Update Error",
@@ -220,6 +238,7 @@ export const useArcGISMap = ({
     metricStats,
     colorScale,
     initializeView,
-    updateMapStyle
+    updateMapStyle,
+    error
   };
 };

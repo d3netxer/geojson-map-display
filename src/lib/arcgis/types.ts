@@ -35,4 +35,5 @@ export interface UseArcGISMapReturn {
   colorScale: string[];
   initializeView: (mapContainer: HTMLDivElement) => void;
   updateMapStyle: (style: string) => void;
+  error?: string | null;
 }
