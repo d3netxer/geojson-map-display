@@ -106,7 +106,7 @@ export const createGeoJSONLayer = (
       },
       visualVariables: visualVariables
     } as any,
-    opacity: 0.85, // Increased opacity for better visibility
+    opacity: 0.95, // Increased opacity from 0.85 to 0.95 for better visibility
     popupEnabled: false,
     outFields: ["*"]
   });
@@ -186,9 +186,9 @@ export const updateLayerVisualization = (
   
   // Update the layer's opacity for better visibility
   if (metric === 'mean_conge') {
-    layer.opacity = 0.85; // Higher opacity for congestion
+    layer.opacity = 0.95; // Increased opacity from 0.85 to 0.95 for congestion
   } else {
-    layer.opacity = 0.7;  // Default opacity
+    layer.opacity = 0.90;  // Increased opacity from 0.7 to 0.90 for other metrics
   }
   
   // Refresh the layer
