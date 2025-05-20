@@ -100,14 +100,14 @@ export const createGeoJSONLayer = (
             size: baseHeight,
             material: { 
               color: colors[0],
-              transparency: 0.9  // Changed to decimal format (0.9 = 90% transparent)
+              transparency: 0.95  // Increased to 95% transparent (0.95)
             }
           }
         ]
       },
       visualVariables: visualVariables
     } as any,
-    opacity: 0.6, // Increased transparency at layer level (0.6 = 40% opaque)
+    opacity: 0.4, // Increased transparency at layer level (0.4 = 60% transparent)
     popupEnabled: false,
     outFields: ["*"]
   });
@@ -194,7 +194,7 @@ export const updateLayerVisualization = (
               size: baseHeight,
               material: { 
                 color: colors[0],
-                transparency: 0.9 // Changed to decimal format (0.9 = 90% transparent)
+                transparency: 0.95 // Increased to 95% transparent (0.95)
               }
             }
           ]
@@ -214,7 +214,7 @@ export const updateLayerVisualization = (
     }
     
     // Update the layer's opacity to increase transparency
-    layer.opacity = 0.6; // Changed to 0.6 (40% opaque)
+    layer.opacity = 0.4; // Increased transparency (0.4 = 60% transparent)
     
     // Refresh the layer
     layer.refresh();
