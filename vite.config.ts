@@ -1,4 +1,3 @@
-
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
@@ -21,42 +20,67 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
-    // More aggressive memory optimization settings
+    // Extreme memory optimization settings
     chunkSizeWarningLimit: 2000,
-    sourcemap: false, // Disable source maps in production to reduce memory usage
+    sourcemap: false, // Disable source maps in production
     minify: 'terser', // Use terser which is more memory-efficient
     terserOptions: {
       compress: {
-        // Aggressive compression
-        passes: 2,
+        passes: 3, // Increase passes for better compression
         drop_console: true,
+        drop_debugger: true,
+        pure_funcs: ['console.log', 'console.info', 'console.debug', 'console.warn']
+      },
+      mangle: {
+        safari10: true,
+      },
+      format: {
+        comments: false
       }
     },
+    assetsInlineLimit: 0, // Don't inline assets to avoid memory spikes
     rollupOptions: {
       output: {
         manualChunks(id) {
-          // More granular chunks to prevent memory spikes
+          // Ultra granular chunks to prevent memory spikes
           if (id.includes('node_modules')) {
+            // ArcGIS modules - split into very small chunks
             if (id.includes('@arcgis/core')) {
-              // Split ArcGIS into smaller chunks
-              if (id.includes('@arcgis/core/views')) {
-                return 'arcgis-views';
-              } else if (id.includes('@arcgis/core/layers')) {
-                return 'arcgis-layers';
-              } else if (id.includes('@arcgis/core/widgets')) {
-                return 'arcgis-widgets';
-              }
-              return 'arcgis-core';
+              if (id.includes('/views')) return 'arcgis-views';
+              if (id.includes('/layers')) return 'arcgis-layers';
+              if (id.includes('/widgets')) return 'arcgis-widgets';
+              if (id.includes('/geometry')) return 'arcgis-geometry';
+              if (id.includes('/core')) return 'arcgis-core-base';
+              return 'arcgis-other';
             }
             
-            // Group common libraries
-            if (id.includes('react')) {
-              return 'vendor-react';
-            }
+            // React and related libraries
+            if (id.includes('react-dom')) return 'vendor-react-dom';
+            if (id.includes('react-router')) return 'vendor-router';
+            if (id.includes('react')) return 'vendor-react';
             
-            return 'vendor';
+            // UI components
+            if (id.includes('@radix-ui')) return 'vendor-radix';
+            if (id.includes('lucide')) return 'vendor-icons';
+            
+            // Other common libraries
+            if (id.includes('@tanstack')) return 'vendor-tanstack';
+            if (id.includes('tailwind')) return 'vendor-styling';
+            
+            return 'vendor-other';
           }
-        }
+          
+          // Split app code to prevent large bundles
+          if (id.includes('/components/')) return 'app-components';
+          if (id.includes('/hooks/')) return 'app-hooks';
+          if (id.includes('/lib/')) return 'app-lib';
+          if (id.includes('/data/')) return 'app-data';
+        },
+        // Ensure small chunk sizes
+        chunkFileNames: (chunkInfo) => {
+          const name = chunkInfo.name;
+          return `assets/[name]-[hash].js`;
+        },
       }
     }
   }

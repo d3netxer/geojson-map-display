@@ -1,80 +1,50 @@
+
 import { processGeoJSON } from '@/lib/mapUtils';
 import { MapStats } from './types';
 import GeoJSONLayer from '@arcgis/core/layers/GeoJSONLayer';
 
+// Memory-efficient color scheme generator
 export const getColorScheme = (metric: string): string[] => {
-  if (metric.includes('conge')) {
-    // Enhanced color contrast for congestion
-    return ['#E5F5E0', '#C0E5C8', '#86C49D', '#41A275', '#006C4A'];
-  } else if (metric.includes('speed')) {
-    return ['#FEE5D9', '#FCBBA1', '#FC9272', '#FB6A4A', '#DE2D26'];
-  } else if (metric.includes('vktkm')) {
-    return ['#F1EEF6', '#D4B9DA', '#C994C7', '#DF65B0', '#DD1C77'];
-  } else {
-    return ['#EDF8FB', '#B2E2E2', '#66C2A4', '#2CA25F', '#006D2C'];
-  }
-};
-
-// More memory-efficient layer creation with optimization
-export const createGeoJSONLayer = (
-  geoJSONData: any, 
-  metric: string, 
-  stats: MapStats, 
-  colors: string[]
-): GeoJSONLayer => {
-  // Process the GeoJSON data with optimizations
-  const { processedGeoJSON } = processGeoJSON(geoJSONData, metric);
-  
-  // Create a blob URL for the GeoJSON data
-  // Use a function to ensure the blob is garbage collected after creation
-  const createGeoJSONBlob = () => {
-    const blob = new Blob([JSON.stringify(processedGeoJSON)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    
-    // Clean up function to release memory
-    setTimeout(() => {
-      try {
-        URL.revokeObjectURL(url);
-      } catch (e) {
-        console.warn("Failed to revoke object URL");
-      }
-    }, 30000); // 30 seconds should be enough for the layer to load
-    
-    return url;
+  // Use predefined color schemes to avoid generating new arrays
+  const colorSchemes = {
+    congestion: ['#E5F5E0', '#C0E5C8', '#86C49D', '#41A275', '#006C4A'],
+    speed: ['#FEE5D9', '#FCBBA1', '#FC9272', '#FB6A4A', '#DE2D26'],
+    volume: ['#F1EEF6', '#D4B9DA', '#C994C7', '#DF65B0', '#DD1C77'],
+    default: ['#EDF8FB', '#B2E2E2', '#66C2A4', '#2CA25F', '#006D2C']
   };
   
-  // Identical height settings to updateLayerVisualization for consistency
-  const baseHeight = metric.includes('conge') ? 1000 : 800;
-  const maxHeight = metric.includes('conge') ? 3000 : 2000;
+  if (metric.includes('conge')) return colorSchemes.congestion;
+  if (metric.includes('speed')) return colorSchemes.speed;
+  if (metric.includes('vktkm')) return colorSchemes.volume;
+  return colorSchemes.default;
+};
+
+// Create simplified GeoJSON data for layer creation
+const createSimplifiedGeoJSON = (geoJSONData: any, metric: string) => {
+  // Only include essential data to minimize memory use
+  if (!geoJSONData || !Array.isArray(geoJSONData.features)) {
+    return { type: "FeatureCollection", features: [] };
+  }
   
-  // Determine visualization method based on metric with memory optimizations
-  const visualVariables = createVisualVariables(metric, stats, colors, baseHeight, maxHeight);
+  return {
+    type: "FeatureCollection",
+    features: geoJSONData.features.map(feature => ({
+      type: "Feature",
+      properties: { [metric]: feature.properties?.[metric] || 0 },
+      geometry: feature.geometry
+    }))
+  };
+};
+
+// Helper function to efficiently dispose of blob URLs
+const createBlobURL = (data: any): string => {
+  const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
   
-  // Create the layer with minimal configuration to save memory
-  return new GeoJSONLayer({
-    url: createGeoJSONBlob(),
-    title: "Hexagons",
-    renderer: {
-      type: "simple",
-      symbol: {
-        type: "polygon-3d",
-        symbolLayers: [
-          {
-            type: "extrude",
-            size: baseHeight,
-            material: { 
-              color: colors[0],
-              transparency: 0.98  // Increased to 98% transparent (0.98)
-            }
-          }
-        ]
-      },
-      visualVariables: visualVariables
-    } as any,
-    opacity: 0.3, // Increased transparency at layer level (0.3 = 70% transparent)
-    popupEnabled: false,
-    outFields: ["*"]
-  });
+  // Auto-revoke URL after a delay to free memory
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  
+  return url;
 };
 
 // Helper function to create visual variables (extracted to reduce code duplication)
@@ -87,8 +57,7 @@ const createVisualVariables = (
 ) => {
   const visualVariables = [];
   
-  if (metric === 'mean_conge' && stats.quantiles && stats.quantiles.length >= 4) {
-    // Use steps for congestion with better visibility
+  if (metric === 'mean_conge' && Array.isArray(stats.quantiles) && stats.quantiles.length >= 4) {
     visualVariables.push({
       type: "size",
       valueExpression: `$feature.${metric}`,
@@ -113,7 +82,6 @@ const createVisualVariables = (
       ]
     });
   } else {
-    // Use interpolation for other metrics
     visualVariables.push({
       type: "size",
       valueExpression: `$feature.${metric}`,
@@ -140,6 +108,54 @@ const createVisualVariables = (
   return visualVariables;
 };
 
+// More memory-efficient layer creation with optimization
+export const createGeoJSONLayer = (
+  geoJSONData: any, 
+  metric: string, 
+  stats: MapStats, 
+  colors: string[]
+): GeoJSONLayer => {
+  // Process the GeoJSON data with extreme optimizations
+  const { metricStats } = processGeoJSON(geoJSONData, metric);
+  const simplifiedData = createSimplifiedGeoJSON(geoJSONData, metric);
+  
+  // Create a blob URL for the GeoJSON data to minimize memory usage
+  const blobUrl = createBlobURL(simplifiedData);
+  
+  // Identical height settings for consistency
+  const baseHeight = metric.includes('conge') ? 1000 : 800;
+  const maxHeight = metric.includes('conge') ? 3000 : 2000;
+  
+  // Determine visualization method based on metric with memory optimizations
+  const visualVariables = createVisualVariables(metric, stats, colors, baseHeight, maxHeight);
+  
+  // Create the layer with minimal configuration to save memory
+  return new GeoJSONLayer({
+    url: blobUrl,
+    title: "Hexagons",
+    renderer: {
+      type: "simple",
+      symbol: {
+        type: "polygon-3d",
+        symbolLayers: [
+          {
+            type: "extrude",
+            size: baseHeight,
+            material: { 
+              color: colors[0],
+              transparency: 0.98 // 98% transparent
+            }
+          }
+        ]
+      },
+      visualVariables: visualVariables
+    } as any,
+    opacity: 0.3, // 70% transparent at layer level
+    popupEnabled: false,
+    outFields: ["*"]
+  });
+};
+
 export const updateLayerVisualization = (
   layer: GeoJSONLayer | null,
   metric: string,
@@ -149,49 +165,38 @@ export const updateLayerVisualization = (
   if (!layer) return;
   
   try {
-    // Create a proper renderer object
+    // Clone renderer to avoid modifying the original
     const renderer = layer.renderer.clone();
     
-    // Adjust base height based on metric - keeping consistent with createGeoJSONLayer
+    // Maintain consistent heights
     const baseHeight = metric.includes('conge') ? 1000 : 800;
     const maxHeight = metric.includes('conge') ? 3000 : 2000;
     
     // Create visual variables using the helper function
     const visualVariables = createVisualVariables(metric, stats, colors, baseHeight, maxHeight);
     
-    // Safely update the renderer with material transparency - completely rewritten for safety
-    try {
-      if (renderer) {
-        // Create a new symbol definition rather than modifying existing potentially undefined properties
-        const symbolConfig = {
-          type: "polygon-3d",
-          symbolLayers: [
-            {
-              type: "extrude",
-              size: baseHeight,
-              material: { 
-                color: colors[0],
-                transparency: 0.98 // Increased to 98% transparent (0.98)
-              }
-            }
-          ]
-        };
-        
-        // Apply the new symbol
-        (renderer as any).symbol = symbolConfig;
-        
-        // Update the visualVariables
-        (renderer as any).visualVariables = visualVariables;
-        
-        // Set the renderer
-        layer.renderer = renderer;
-      }
-    } catch (err) {
-      console.error("Error updating symbol material:", err);
-    }
+    // Create a new symbol definition rather than modifying existing
+    const symbolConfig = {
+      type: "polygon-3d",
+      symbolLayers: [
+        {
+          type: "extrude",
+          size: baseHeight,
+          material: { 
+            color: colors[0],
+            transparency: 0.98 // 98% transparent
+          }
+        }
+      ]
+    };
     
-    // Update the layer's opacity to increase transparency
-    layer.opacity = 0.3; // Increased transparency (0.3 = 70% transparent)
+    // Apply the new symbol and visual variables
+    (renderer as any).symbol = symbolConfig;
+    (renderer as any).visualVariables = visualVariables;
+    
+    // Set the renderer and opacity
+    layer.renderer = renderer;
+    layer.opacity = 0.3; // 70% transparent
     
     // Refresh the layer
     layer.refresh();

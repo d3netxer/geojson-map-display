@@ -1,25 +1,31 @@
 // Function to optimize GeoJSON for performance by simplifying when needed
 export const optimizeGeoJSON = (geoJSON: any): any => {
-  if (!geoJSON || !geoJSON.features || geoJSON.features.length === 0) {
+  if (!geoJSON || typeof geoJSON.features !== 'object') {
     return geoJSON;
   }
 
   // Create a new object to avoid reference issues
-  const optimizedGeoJSON = {
+  return {
     type: geoJSON.type,
-    features: geoJSON.features.map((feature: any) => {
-      // Only keep necessary properties to reduce memory footprint
-      const optimizedFeature = {
-        type: feature.type,
-        properties: simplifyProperties(feature.properties),
-        geometry: simplifyGeometry(feature.geometry)
-      };
-      
-      return optimizedFeature;
-    }).filter(Boolean)
+    // Don't process features if not needed - use a getter
+    get features() {
+      return Array.isArray(geoJSON.features) ? 
+        geoJSON.features.map(simplifyFeature).filter(Boolean) :
+        [];
+    }
   };
+};
 
-  return optimizedGeoJSON;
+// Simplified feature creation
+const simplifyFeature = (feature: any): any => {
+  if (!feature) return null;
+  
+  // Only keep necessary properties to reduce memory footprint
+  return {
+    type: feature.type,
+    properties: simplifyProperties(feature.properties),
+    geometry: simplifyGeometry(feature.geometry)
+  };
 };
 
 // Simplify properties by only keeping essential ones
@@ -28,8 +34,6 @@ const simplifyProperties = (properties: any): any => {
   
   // Keep only the properties we actually use in visualization
   const essentialProps: Record<string, any> = {};
-  
-  // List of properties we actually use in the app
   const usedProps = ['mean_conge', 'mean_speed', 'vktkm', 'id', 'name', 'hex_id'];
   
   for (const key of usedProps) {
@@ -44,54 +48,46 @@ const simplifyProperties = (properties: any): any => {
 // Simplify geometry to reduce memory footprint
 const simplifyGeometry = (geometry: any): any => {
   if (!geometry) return null;
-
-  // Create a new object with only the necessary properties
   return {
     type: geometry.type,
     coordinates: geometry.coordinates
-    // We don't modify coordinates here for precision, but in a real app
-    // you might implement Douglas-Peucker algorithm for polygon simplification
   };
 };
 
 // Lazily load GeoJSON data by feature chunks
 export const createLazyGeoJSON = (geoJSON: any): any => {
-  if (!geoJSON || !geoJSON.features || geoJSON.features.length === 0) {
+  if (!geoJSON || typeof geoJSON.features !== 'object') {
     return geoJSON;
   }
   
   // Return a proxy object that loads features on demand
   return {
     type: geoJSON.type,
+    crs: geoJSON.crs,
     // Create a getter for features to load them on demand
     get features() {
       return optimizeGeoJSON(geoJSON).features;
     },
     // Add method to get features in chunks to prevent memory spikes
     getFeaturesInChunks(chunkSize = 1000) {
-      const features = geoJSON.features;
+      if (!Array.isArray(geoJSON.features)) return [];
+      
       const chunks = [];
-      
-      for (let i = 0; i < features.length; i += chunkSize) {
-        chunks.push(features.slice(i, i + chunkSize).map((feature: any) => ({
-          type: feature.type,
-          properties: simplifyProperties(feature.properties),
-          geometry: simplifyGeometry(feature.geometry)
-        })));
+      for (let i = 0; i < geoJSON.features.length; i += chunkSize) {
+        chunks.push(geoJSON.features.slice(i, i + chunkSize).map(simplifyFeature).filter(Boolean));
       }
-      
       return chunks;
     }
   };
 };
 
-// Export memory-efficient functions for working with GeoJSON
+// Memory-efficient functions for working with GeoJSON
 export const getFeatureCount = (geoJSON: any): number => {
   return geoJSON?.features?.length || 0;
 };
 
 export const getFeatureProperties = (geoJSON: any): string[] => {
-  if (!geoJSON?.features?.[0]?.properties) {
+  if (!Array.isArray(geoJSON?.features) || !geoJSON.features[0]?.properties) {
     return [];
   }
   return Object.keys(geoJSON.features[0].properties);
