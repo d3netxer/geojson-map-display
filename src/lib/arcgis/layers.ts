@@ -1,3 +1,4 @@
+
 import { processGeoJSON } from '@/lib/mapUtils';
 import { MapStats } from './types';
 import GeoJSONLayer from '@arcgis/core/layers/GeoJSONLayer';
@@ -28,9 +29,62 @@ export const createGeoJSONLayer = (
   const geojsonBlob = new Blob([JSON.stringify(processedGeoJSON)], { type: "application/json" });
   const geojsonUrl = URL.createObjectURL(geojsonBlob);
   
-  // Increase base height for better initial visualization
+  // Identical height settings to updateLayerVisualization for consistency
   const baseHeight = metric.includes('conge') ? 1000 : 800;
   const maxHeight = metric.includes('conge') ? 3000 : 2000;
+  
+  // Determine visualization method based on metric
+  const visualVariables = [];
+  
+  if (metric === 'mean_conge' && stats.quantiles && stats.quantiles.length >= 4) {
+    // Use steps for congestion with better visibility
+    visualVariables.push({
+      type: "size",
+      valueExpression: `$feature.${metric}`,
+      stops: [
+        { value: stats.min, size: 1000 },
+        { value: stats.quantiles[1], size: 1500 },
+        { value: stats.quantiles[2], size: 2000 },
+        { value: stats.quantiles[3], size: 2500 },
+        { value: stats.max, size: 3000 }
+      ]
+    });
+    
+    visualVariables.push({
+      type: "color",
+      valueExpression: `$feature.${metric}`,
+      stops: [
+        { value: stats.min, color: colors[0] },
+        { value: stats.quantiles[1], color: colors[1] },
+        { value: stats.quantiles[2], color: colors[2] },
+        { value: stats.quantiles[3], color: colors[3] },
+        { value: stats.max, color: colors[4] }
+      ]
+    });
+  } else {
+    // Use interpolation for other metrics
+    visualVariables.push({
+      type: "size",
+      valueExpression: `$feature.${metric}`,
+      valueUnit: "meters",
+      minDataValue: stats.min,
+      maxDataValue: stats.max,
+      minSize: baseHeight,
+      maxSize: maxHeight
+    });
+    
+    visualVariables.push({
+      type: "color",
+      valueExpression: `$feature.${metric}`,
+      stops: [
+        { value: stats.min, color: colors[0] },
+        { value: stats.min + (stats.range * 0.25), color: colors[1] },
+        { value: stats.min + (stats.range * 0.5), color: colors[2] },
+        { value: stats.min + (stats.range * 0.75), color: colors[3] },
+        { value: stats.max, color: colors[4] }
+      ]
+    });
+  }
   
   // Create and return the GeoJSON layer
   return new GeoJSONLayer({
@@ -50,29 +104,8 @@ export const createGeoJSONLayer = (
           }
         ]
       },
-      visualVariables: [
-        {
-          type: "size",
-          valueExpression: `$feature.${metric}`,
-          valueUnit: "meters",
-          minDataValue: stats.min,
-          maxDataValue: stats.max,
-          minSize: baseHeight,
-          maxSize: maxHeight
-        } as any,
-        {
-          type: "color",
-          valueExpression: `$feature.${metric}`,
-          stops: [
-            { value: stats.min, color: colors[0] },
-            { value: stats.min + (stats.range * 0.25), color: colors[1] },
-            { value: stats.min + (stats.range * 0.5), color: colors[2] },
-            { value: stats.min + (stats.range * 0.75), color: colors[3] },
-            { value: stats.max, color: colors[4] }
-          ]
-        } as any
-      ]
-    },
+      visualVariables: visualVariables
+    } as any,
     opacity: 0.85, // Increased opacity for better visibility
     popupEnabled: false,
     outFields: ["*"]
