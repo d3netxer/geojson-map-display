@@ -1,5 +1,4 @@
-
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { ArrowDown, Layers, Maximize2, BarChart3, Info } from 'lucide-react';
 import { toast } from 'sonner';
@@ -44,7 +43,7 @@ const MapboxMap = ({ apiKey, geoJSONData, onError }: MapboxMapProps) => {
 
   const token = apiKey || '';
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!mapContainer.current) return;
     
     if (!validateMapboxToken(token)) {
@@ -129,18 +128,25 @@ const MapboxMap = ({ apiKey, geoJSONData, onError }: MapboxMapProps) => {
         
         // For congestion, use a step function with quantiles
         if (metric.includes('conge') && stats.quantiles) {
-          // Ensure quantiles are in ascending order for the step expression
+          // Ensure quantiles are in ascending order and unique for step expression
           const sortedQuantiles = [...stats.quantiles].sort((a, b) => a - b);
+          const uniqueSortedValues = Array.from(new Set(sortedQuantiles)).sort((a, b) => a - b);
           
+          // Create pairs of values and colors for the step expression
+          const stepPairs = [];
+          for (let i = 0; i < Math.min(uniqueSortedValues.length, colors.length - 1); i++) {
+            stepPairs.push(uniqueSortedValues[i], colors[i + 1]);
+          }
+          
+          // Build the complete step expression with safe, ascending values
           colorExpression = [
             'step',
             ['get', metric],
             colors[0],
-            sortedQuantiles[0], colors[1],
-            sortedQuantiles[1], colors[2],
-            sortedQuantiles[2], colors[3],
-            sortedQuantiles[3], colors[4]
+            ...stepPairs
           ];
+          
+          console.log('Using color step expression with quantiles:', uniqueSortedValues);
           
           // Make sure height values are in strictly ascending order
           heightExpression = [
@@ -244,7 +250,7 @@ const MapboxMap = ({ apiKey, geoJSONData, onError }: MapboxMapProps) => {
   }, [token, mapStyle, geoJSONData]);
   
   // Update visualization when metric changes
-  useEffect(() => {
+  React.useEffect(() => {
     if (!map.current || !map.current.isStyleLoaded() || map.current.getSource('riyadh-hexagons') === undefined) return;
     
     try {
@@ -258,17 +264,22 @@ const MapboxMap = ({ apiKey, geoJSONData, onError }: MapboxMapProps) => {
       let heightExpression;
       
       if (metric.includes('conge') && stats.quantiles) {
-        // Ensure quantiles are in ascending order
+        // Ensure quantiles are in ascending order and unique for step expression
         const sortedQuantiles = [...stats.quantiles].sort((a, b) => a - b);
+        const uniqueSortedValues = Array.from(new Set(sortedQuantiles)).sort((a, b) => a - b);
         
+        // Create pairs of values and colors for the step expression
+        const stepPairs = [];
+        for (let i = 0; i < Math.min(uniqueSortedValues.length, colors.length - 1); i++) {
+          stepPairs.push(uniqueSortedValues[i], colors[i + 1]);
+        }
+        
+        // Build the complete step expression with safe, ascending values
         colorExpression = [
           'step',
           ['get', metric],
           colors[0],
-          sortedQuantiles[0], colors[1],
-          sortedQuantiles[1], colors[2],
-          sortedQuantiles[2], colors[3],
-          sortedQuantiles[3], colors[4]
+          ...stepPairs
         ];
         
         // Use interpolate for height to avoid step expression errors
@@ -316,7 +327,7 @@ const MapboxMap = ({ apiKey, geoJSONData, onError }: MapboxMapProps) => {
   }, [metric]);
   
   // Handle fullscreen mode
-  useEffect(() => {
+  React.useEffect(() => {
     if (!mapContainer.current) return;
     
     if (fullscreen) {
