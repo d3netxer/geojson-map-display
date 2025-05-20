@@ -183,10 +183,15 @@ export const updateLayerVisualization = (
   }
   
   // Update the renderer with material transparency
-  if ((renderer as any).symbol && (renderer as any).symbol.symbolLayers) {
+  // Fix for "Cannot set properties of undefined" error
+  if (
+    (renderer as any).symbol && 
+    (renderer as any).symbol.symbolLayers && 
+    (renderer as any).symbol.symbolLayers.length > 0
+  ) {
     (renderer as any).symbol.symbolLayers[0].material = {
       color: colors[0],
-      transparency: 80 // 30% transparent
+      transparency: 80 // 30% transparent (transparency is 0-100)
     };
   }
   
@@ -195,9 +200,8 @@ export const updateLayerVisualization = (
   layer.renderer = renderer;
   
   // Update the layer's opacity
-  layer.opacity = 0.8;
+  layer.opacity = 0.99;
   
   // Refresh the layer
   layer.refresh();
 };
-
