@@ -392,6 +392,76 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onError }) =
         fullscreen={fullscreen}
         selectedFeature={selectedFeature}
       />
+
+      {/* Add some CSS */}
+      <style jsx>{`
+        .map-overlay {
+          position: absolute;
+          top: 20px;
+          left: 20px;
+          z-index: 10;
+          padding: 12px;
+          border-radius: 8px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+          max-width: 350px;
+          backdrop-filter: blur(8px);
+        }
+        
+        .map-control {
+          position: absolute;
+          top: 20px;
+          right: 20px;
+          z-index: 10;
+          padding: 12px;
+          border-radius: 8px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          width: 180px;
+          backdrop-filter: blur(8px);
+        }
+        
+        .glass-card {
+          background-color: rgba(255, 255, 255, 0.8);
+          border: 1px solid rgba(255, 255, 255, 0.3);
+          backdrop-filter: blur(8px);
+        }
+        
+        .chip {
+          display: inline-block;
+          padding: 2px 8px;
+          background-color: #e0f2fe;
+          color: #0369a1;
+          font-size: 12px;
+          font-weight: 500;
+          border-radius: 999px;
+        }
+        
+        .info-row {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 4px;
+          font-size: 14px;
+        }
+        
+        .info-label {
+          color: #6b7280;
+        }
+        
+        .info-value {
+          font-weight: 500;
+        }
+        
+        .animate-fade-in {
+          animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 };
