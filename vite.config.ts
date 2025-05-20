@@ -1,4 +1,3 @@
-
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
@@ -25,21 +24,7 @@ export default defineConfig(({ mode }) => ({
     // Extreme memory optimization settings
     chunkSizeWarningLimit: 2000,
     sourcemap: false, // Disable source maps in production
-    minify: 'terser', // Use terser which is more memory-efficient
-    terserOptions: {
-      compress: {
-        passes: 3, // Increase passes for better compression
-        drop_console: true,
-        drop_debugger: true,
-        pure_funcs: ['console.log', 'console.info', 'console.debug', 'console.warn']
-      },
-      mangle: {
-        safari10: true,
-      },
-      format: {
-        comments: false
-      }
-    },
+    minify: 'esbuild', // Use esbuild instead of terser which is more memory-efficient
     assetsInlineLimit: 0, // Don't inline assets to avoid memory spikes
     rollupOptions: {
       output: {
