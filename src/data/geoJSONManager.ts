@@ -1,16 +1,16 @@
 
 import defaultGeoJSON from './defaultGeoJSON';
 import customGeoJSON from './customGeoJSON';
-import { optimizeGeoJSON } from './geoJSONOptimizer';
+import { optimizeGeoJSON, createLazyGeoJSON } from './geoJSONOptimizer';
 
 // This is the environment variable check using Vite's import.meta.env
 // Set this to 'custom' in your development environment to use the custom GeoJSON
 const GEOJSON_SOURCE = import.meta.env.VITE_GEOJSON_SOURCE || 'custom';
 
-// Object containing all available datasets
+// Object containing all available datasets - use lazy loading for memory efficiency
 const datasets = {
-  default: defaultGeoJSON,
-  custom: customGeoJSON,
+  default: createLazyGeoJSON(defaultGeoJSON),
+  custom: createLazyGeoJSON(customGeoJSON),
 };
 
 // Function to check if a GeoJSON is in EPSG:3857 (Web Mercator) projection
@@ -39,21 +39,20 @@ const isWGS84 = (geojson: any): boolean => {
 // Function to get the active dataset based on environment configuration
 export const getActiveGeoJSON = () => {
   // Get the dataset based on the environment variable
-  const geoJSON = datasets[GEOJSON_SOURCE as keyof typeof datasets] || customGeoJSON;
+  const geoJSON = datasets[GEOJSON_SOURCE as keyof typeof datasets] || datasets.custom;
   
   // Verify that the GeoJSON is in WGS84 format
   if (!isWGS84(geoJSON)) {
     console.warn('The GeoJSON data is not in WGS84 format. This may cause rendering issues.');
   }
   
-  // Optimize the GeoJSON to reduce memory usage
-  return optimizeGeoJSON(geoJSON);
+  return geoJSON;
 };
 
-// Export all datasets for direct access if needed
+// Export all datasets for direct access if needed - optimized to reduce memory usage
 export const geoJSONDatasets = {
-  default: optimizeGeoJSON(defaultGeoJSON),
-  custom: optimizeGeoJSON(customGeoJSON)
+  default: datasets.default,
+  custom: datasets.custom
 };
 
 // Default export is the active dataset

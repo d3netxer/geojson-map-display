@@ -21,16 +21,39 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
-    // Add build configuration to optimize memory usage
-    chunkSizeWarningLimit: 1600,
+    // More aggressive memory optimization settings
+    chunkSizeWarningLimit: 2000,
+    sourcemap: false, // Disable source maps in production to reduce memory usage
+    minify: 'terser', // Use terser which is more memory-efficient
+    terserOptions: {
+      compress: {
+        // Aggressive compression
+        passes: 2,
+        drop_console: true,
+      }
+    },
     rollupOptions: {
       output: {
         manualChunks(id) {
-          // Split large external libraries into separate chunks
+          // More granular chunks to prevent memory spikes
           if (id.includes('node_modules')) {
             if (id.includes('@arcgis/core')) {
-              return 'arcgis';
+              // Split ArcGIS into smaller chunks
+              if (id.includes('@arcgis/core/views')) {
+                return 'arcgis-views';
+              } else if (id.includes('@arcgis/core/layers')) {
+                return 'arcgis-layers';
+              } else if (id.includes('@arcgis/core/widgets')) {
+                return 'arcgis-widgets';
+              }
+              return 'arcgis-core';
             }
+            
+            // Group common libraries
+            if (id.includes('react')) {
+              return 'vendor-react';
+            }
+            
             return 'vendor';
           }
         }

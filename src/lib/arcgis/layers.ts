@@ -15,24 +15,76 @@ export const getColorScheme = (metric: string): string[] => {
   }
 };
 
+// More memory-efficient layer creation with optimization
 export const createGeoJSONLayer = (
   geoJSONData: any, 
   metric: string, 
   stats: MapStats, 
   colors: string[]
 ): GeoJSONLayer => {
-  // Process the GeoJSON data
+  // Process the GeoJSON data with optimizations
   const { processedGeoJSON } = processGeoJSON(geoJSONData, metric);
   
   // Create a blob URL for the GeoJSON data
-  const geojsonBlob = new Blob([JSON.stringify(processedGeoJSON)], { type: "application/json" });
-  const geojsonUrl = URL.createObjectURL(geojsonBlob);
+  // Use a function to ensure the blob is garbage collected after creation
+  const createGeoJSONBlob = () => {
+    const blob = new Blob([JSON.stringify(processedGeoJSON)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    
+    // Clean up function to release memory
+    setTimeout(() => {
+      try {
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        console.warn("Failed to revoke object URL");
+      }
+    }, 30000); // 30 seconds should be enough for the layer to load
+    
+    return url;
+  };
   
   // Identical height settings to updateLayerVisualization for consistency
   const baseHeight = metric.includes('conge') ? 1000 : 800;
   const maxHeight = metric.includes('conge') ? 3000 : 2000;
   
-  // Determine visualization method based on metric
+  // Determine visualization method based on metric with memory optimizations
+  const visualVariables = createVisualVariables(metric, stats, colors, baseHeight, maxHeight);
+  
+  // Create the layer with minimal configuration to save memory
+  return new GeoJSONLayer({
+    url: createGeoJSONBlob(),
+    title: "Hexagons",
+    renderer: {
+      type: "simple",
+      symbol: {
+        type: "polygon-3d",
+        symbolLayers: [
+          {
+            type: "extrude",
+            size: baseHeight,
+            material: { 
+              color: colors[0],
+              transparency: 0.98  // Increased to 98% transparent (0.98)
+            }
+          }
+        ]
+      },
+      visualVariables: visualVariables
+    } as any,
+    opacity: 0.3, // Increased transparency at layer level (0.3 = 70% transparent)
+    popupEnabled: false,
+    outFields: ["*"]
+  });
+};
+
+// Helper function to create visual variables (extracted to reduce code duplication)
+const createVisualVariables = (
+  metric: string, 
+  stats: MapStats, 
+  colors: string[],
+  baseHeight: number,
+  maxHeight: number
+) => {
   const visualVariables = [];
   
   if (metric === 'mean_conge' && stats.quantiles && stats.quantiles.length >= 4) {
@@ -85,31 +137,7 @@ export const createGeoJSONLayer = (
     });
   }
   
-  // Create and return the GeoJSON layer
-  return new GeoJSONLayer({
-    url: geojsonUrl,
-    title: "Riyadh Hexagons",
-    renderer: {
-      type: "simple",
-      symbol: {
-        type: "polygon-3d",
-        symbolLayers: [
-          {
-            type: "extrude",
-            size: baseHeight,
-            material: { 
-              color: colors[0],
-              transparency: 0.98  // Increased to 98% transparent (0.98)
-            }
-          }
-        ]
-      },
-      visualVariables: visualVariables
-    } as any,
-    opacity: 0.3, // Increased transparency at layer level (0.3 = 70% transparent)
-    popupEnabled: false,
-    outFields: ["*"]
-  });
+  return visualVariables;
 };
 
 export const updateLayerVisualization = (
@@ -128,58 +156,8 @@ export const updateLayerVisualization = (
     const baseHeight = metric.includes('conge') ? 1000 : 800;
     const maxHeight = metric.includes('conge') ? 3000 : 2000;
     
-    // Update the visual variables
-    const visualVariables = [];
-    
-    if (metric === 'mean_conge' && stats.quantiles) {
-      // Use steps for congestion with better visibility
-      visualVariables.push({
-        type: "size",
-        valueExpression: `$feature.${metric}`,
-        stops: [
-          { value: stats.min, size: 1000 },
-          { value: stats.quantiles[1], size: 1500 },
-          { value: stats.quantiles[2], size: 2000 },
-          { value: stats.quantiles[3], size: 2500 },
-          { value: stats.max, size: 3000 }
-        ]
-      });
-      
-      visualVariables.push({
-        type: "color",
-        valueExpression: `$feature.${metric}`,
-        stops: [
-          { value: stats.min, color: colors[0] },
-          { value: stats.quantiles[1], color: colors[1] },
-          { value: stats.quantiles[2], color: colors[2] },
-          { value: stats.quantiles[3], color: colors[3] },
-          { value: stats.max, color: colors[4] }
-        ]
-      });
-    } else {
-      // Use interpolation for other metrics
-      visualVariables.push({
-        type: "size",
-        valueExpression: `$feature.${metric}`,
-        valueUnit: "meters",
-        minDataValue: stats.min,
-        maxDataValue: stats.max,
-        minSize: baseHeight,
-        maxSize: maxHeight
-      });
-      
-      visualVariables.push({
-        type: "color",
-        valueExpression: `$feature.${metric}`,
-        stops: [
-          { value: stats.min, color: colors[0] },
-          { value: stats.min + (stats.range * 0.25), color: colors[1] },
-          { value: stats.min + (stats.range * 0.5), color: colors[2] },
-          { value: stats.min + (stats.range * 0.75), color: colors[3] },
-          { value: stats.max, color: colors[4] }
-        ]
-      });
-    }
+    // Create visual variables using the helper function
+    const visualVariables = createVisualVariables(metric, stats, colors, baseHeight, maxHeight);
     
     // Safely update the renderer with material transparency - completely rewritten for safety
     try {
