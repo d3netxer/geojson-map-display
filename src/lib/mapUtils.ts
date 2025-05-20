@@ -49,8 +49,8 @@ export const getColorScale = (min: number, max: number, metric: string) => {
     // Speed: green (slow) to red (fast)
     return ['#198754', '#5cb85c', '#6c757d', '#fd7e14', '#dc3545'];
   } else if (metric === 'mean_conge') {
-    // Congestion: green (low) to red (high)
-    return ['#198754', '#5cb85c', '#ffc107', '#fd7e14', '#dc3545'];
+    // Congestion: green (low) to red (high) - more distinct color gradient
+    return ['#E5F5E0', '#C0E5C8', '#86C49D', '#41A275', '#006C4A'];
   } else if (metric === 'sum_vktkm') {
     // Vehicle kilometers: light to dark blue
     return ['#cfe2ff', '#9ec5fe', '#6ea8fe', '#3d8bfd', '#0d6efd'];
@@ -85,8 +85,8 @@ export const getHeightMultiplier = (metric: string, value: number, min: number, 
   
   // For congestion, we want higher congestion to have taller hexagons
   if (metric === 'mean_conge') {
-    // Scale from 200 to 2500
-    return 200 + (normalizedValue * 2300);
+    // Scale from 300 to 3000 for better visibility
+    return 300 + (normalizedValue * 2700);
   } 
   
   // For speed, higher speeds should be taller
