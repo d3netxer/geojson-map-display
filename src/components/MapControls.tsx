@@ -49,14 +49,6 @@ const MapControls: React.FC<MapControlsProps> = ({
         <PopoverContent className="w-56 p-0" align="end">
           <div className="p-2">
             <Button 
-              variant={metric === 'mean_speed' ? 'default' : 'ghost'} 
-              className="w-full justify-start mb-1" 
-              size="sm"
-              onClick={() => onMetricChange('mean_speed')}
-            >
-              Average Speed
-            </Button>
-            <Button 
               variant={metric === 'mean_conge' ? 'default' : 'ghost'} 
               className="w-full justify-start mb-1" 
               size="sm"
@@ -66,19 +58,11 @@ const MapControls: React.FC<MapControlsProps> = ({
             </Button>
             <Button 
               variant={metric === 'sum_vktkm' ? 'default' : 'ghost'} 
-              className="w-full justify-start mb-1" 
+              className="w-full justify-start" 
               size="sm"
               onClick={() => onMetricChange('sum_vktkm')}
             >
               Vehicle Kilometers
-            </Button>
-            <Button 
-              variant={metric === 'sum_urban_' ? 'default' : 'ghost'} 
-              className="w-full justify-start" 
-              size="sm"
-              onClick={() => onMetricChange('sum_urban_')}
-            >
-              Urban Road Length
             </Button>
           </div>
         </PopoverContent>

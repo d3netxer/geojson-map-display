@@ -17,7 +17,7 @@ interface ArcGISMapProps {
 
 const ArcGISMap: React.FC<ArcGISMapProps> = ({ apiKey, geoJSONData, onError }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const [metric, setMetric] = useState<string>('mean_speed');
+  const [metric, setMetric] = useState<string>('mean_conge');
   const [selectedFeature, setSelectedFeature] = useState<any>(null);
   const [mapStyle, setMapStyle] = useState<string>('streets');
   const [fullscreen, setFullscreen] = useState<boolean>(false);
