@@ -186,7 +186,7 @@ export const updateLayerVisualization = (
   if ((renderer as any).symbol && (renderer as any).symbol.symbolLayers) {
     (renderer as any).symbol.symbolLayers[0].material = {
       color: colors[0],
-      transparency: 30 // 30% transparent
+      transparency: 80 // 30% transparent
     };
   }
   
