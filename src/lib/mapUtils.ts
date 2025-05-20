@@ -14,10 +14,18 @@ export const processGeoJSON = (geojson: any, metric: string) => {
     .map((feature: any) => feature.properties[metric])
     .filter((val: any) => val !== undefined && val !== null);
 
+  if (values.length === 0) {
+    console.error(`No valid values found for metric: ${metric}`);
+    return { 
+      processedGeoJSON, 
+      metricStats: { min: 0, max: 1, mean: 0, range: 1, quantiles: [0.2, 0.4, 0.6, 0.8] } 
+    };
+  }
+
   // Get min, max, mean, and range
   const min = Math.min(...values);
   const max = Math.max(...values);
-  const range = max - min;
+  const range = max - min > 0 ? max - min : 1; // Avoid division by zero
   const mean = values.reduce((a: number, b: number) => a + b, 0) / values.length;
 
   // Calculate quantiles for better visualization
@@ -81,7 +89,8 @@ export const formatValue = (value: number | undefined | null, metric: string) =>
 
 // Function to calculate height multiplier based on metric type
 export const getHeightMultiplier = (metric: string, value: number, min: number, max: number) => {
-  const normalizedValue = (value - min) / (max - min);
+  // Avoid division by zero
+  const normalizedValue = max > min ? (value - min) / (max - min) : 0.5;
   
   // For congestion, we want higher congestion to have taller hexagons
   if (metric === 'mean_conge') {

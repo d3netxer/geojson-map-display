@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Toaster } from "sonner";
 import { toast } from "sonner";
-import ArcGISMap from '../components/ArcGISMap';
+import MapboxMap from '../components/MapboxMap';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -13,13 +13,12 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import activeGeoJSON, { getActiveGeoJSON, geoJSONDatasets } from '../data/geoJSONManager';
 
 // Local storage key for API key
-const API_KEY_STORAGE_KEY = 'arcgis_api_key';
+const API_KEY_STORAGE_KEY = 'mapbox_access_token';
 
 // Demo API keys - using multiple in case one is expired or rate-limited
 const DEMO_API_KEYS = [
-  'AAPK8fd45a4074594a07b05866eb98ccdc68JilzMsKIcnbJzMc1Ktyb1CiJ0jFUB4IxmU0bnZ9_xuSKHaZJh8L6eL3cPQE_bRWl',
-  'AAPKcfa468a9d58e4e9a8c42b9b36bfb3b1GGS8kYzjagZjc4XVEH3NRRXtZXk7dUfxOtUm88sTuFdpMcU1tILlWadjQlr6Wf-W',
-  'AAPKee42e9c9fc0b4bafa532bf8690e03a0UtTB7TIFCZj5fMsNLdXTAnXkgrB9e3GUj1SJXzI6pAq0JIJFgPBgO5ovyB9-W8uGv'
+  'pk.eyJ1IjoidGdlcnRpbiIsImEiOiJYTW5sTVhRIn0.X4B5APkxkWVaiSg3KqMCaQ',
+  'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4M29iazA2Z2gycXA4N2pmbDZmangifQ.-g_vE53SD2WrJ6tFX7QHmA'
 ];
 
 // Choose a random demo key to avoid rate limiting issues
@@ -43,15 +42,15 @@ const Index = () => {
     const storedApiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
     if (storedApiKey) {
       setApiKey(storedApiKey);
-      console.log("Using stored API key");
+      console.log("Using stored Mapbox access token");
     } else {
       const demoKey = getRandomDemoKey();
       setApiKey(demoKey);
-      console.log("Using demo API key");
+      console.log("Using demo Mapbox access token");
       
       // Show informational toast about demo key limitations
       toast.info(
-        "Using demo ArcGIS API key with limited functionality. For full features, enter your own key.", 
+        "Using demo Mapbox access token with limited functionality. For full features, enter your own key.", 
         { duration: 6000 }
       );
     }
@@ -66,7 +65,7 @@ const Index = () => {
   useEffect(() => {
     if (mapError && retryCount < DEMO_API_KEYS.length) {
       const timer = setTimeout(() => {
-        console.log(`Retrying with a different API key (attempt ${retryCount + 1})`);
+        console.log(`Retrying with a different Mapbox access token (attempt ${retryCount + 1})`);
         const newKey = DEMO_API_KEYS[(retryCount + 1) % DEMO_API_KEYS.length];
         setApiKey(newKey);
         setMapError(null);
@@ -85,7 +84,7 @@ const Index = () => {
 
   const handleApiKeySubmit = () => {
     if (!apiKey.trim()) {
-      toast.error('Please enter a valid ArcGIS API key');
+      toast.error('Please enter a valid Mapbox access token');
       return;
     }
     
@@ -100,7 +99,7 @@ const Index = () => {
     setTimeout(() => {
       setMapReady(true);
       setShowApiKeyModal(false);
-      toast.success('ArcGIS API key applied and saved for future sessions');
+      toast.success('Mapbox access token applied and saved for future sessions');
     }, 100);
   };
 
@@ -132,7 +131,7 @@ const Index = () => {
             <ol className="list-decimal list-inside space-y-2 text-gray-700">
               <li>Check your internet connection</li>
               <li>Try using a different browser</li>
-              <li>Enter your own ArcGIS API key (click the info button)</li>
+              <li>Enter your own Mapbox access token (click the info button)</li>
               <li>Clear your browser cache and reload the page</li>
             </ol>
             
@@ -141,13 +140,13 @@ const Index = () => {
                 className="w-full" 
                 onClick={() => setShowApiKeyModal(true)}
               >
-                Update API Key
+                Update Access Token
               </Button>
             </div>
           </div>
           
           <p className="text-sm text-gray-500 mt-4">
-            This application requires ArcGIS to visualize geospatial data.
+            This application requires Mapbox to visualize geospatial data.
           </p>
         </div>
       </div>
@@ -174,7 +173,7 @@ const Index = () => {
           {mapError && retryCount >= DEMO_API_KEYS.length ? (
             renderFallbackContent()
           ) : (
-            <ArcGISMap 
+            <MapboxMap 
               apiKey={apiKey} 
               geoJSONData={currentGeoJSON} 
               onError={handleMapError} 
@@ -187,27 +186,27 @@ const Index = () => {
       <Dialog open={showApiKeyModal} onOpenChange={setShowApiKeyModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>ArcGIS Map Configuration</DialogTitle>
+            <DialogTitle>Mapbox Configuration</DialogTitle>
             <DialogDescription>
-              This application uses ArcGIS to visualize geospatial data. For full functionality, you need to provide your own ArcGIS API key.
-              {localStorage.getItem(API_KEY_STORAGE_KEY) ? " Your API key will be saved for future sessions." : ""}
+              This application uses Mapbox to visualize geospatial data. For full functionality, you need to provide your own Mapbox access token.
+              {localStorage.getItem(API_KEY_STORAGE_KEY) ? " Your access token will be saved for future sessions." : ""}
             </DialogDescription>
           </DialogHeader>
           
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <label htmlFor="apiKey" className="text-sm font-medium">
-                ArcGIS API Key
+                Mapbox Access Token
               </label>
               <Input
                 id="apiKey"
-                placeholder="Enter your ArcGIS API key"
+                placeholder="Enter your Mapbox access token"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                You can get an ArcGIS API key from the <a href="https://developers.arcgis.com/" target="_blank" rel="noopener noreferrer" className="underline text-primary">ArcGIS Developer portal</a>.
-                Your API key will be saved locally on your device for convenience.
+                You can get a Mapbox access token from the <a href="https://account.mapbox.com/" target="_blank" rel="noopener noreferrer" className="underline text-primary">Mapbox account page</a>.
+                Your access token will be saved locally on your device for convenience.
               </p>
             </div>
             
@@ -225,18 +224,9 @@ const Index = () => {
             
             <div className="flex justify-end">
               <Button type="button" onClick={handleApiKeySubmit}>
-                Apply API Key
+                Apply Access Token
               </Button>
             </div>
-            
-            <Alert className="mt-4 bg-yellow-50 border-yellow-100">
-              <AlertCircle className="h-4 w-4 text-yellow-600" />
-              <AlertTitle className="text-yellow-700">GitHub Pages Deployment</AlertTitle>
-              <AlertDescription className="text-yellow-600 text-sm">
-                When running on GitHub Pages, some ArcGIS features may be limited due to CORS restrictions.
-                For best results, use your own ArcGIS API key with appropriate permissions.
-              </AlertDescription>
-            </Alert>
           </div>
         </DialogContent>
       </Dialog>

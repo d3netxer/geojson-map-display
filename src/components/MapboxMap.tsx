@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { ArrowDown, Layers, Maximize2, BarChart3, Info } from 'lucide-react';
@@ -5,19 +6,22 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
-import { processGeoJSON, getColorScale, formatValue, getHeightMultiplier } from '@/lib/mapUtils';
+import { processGeoJSON, getColorScale, formatValue } from '@/lib/mapUtils';
 import MapLegend from './MapLegend';
+import MapControls from './MapControls';
+import MapInfoOverlay from './MapInfoOverlay';
 
 interface MapboxMapProps {
   apiKey?: string;
   geoJSONData: any;
+  onError?: (error: string) => void;
 }
 
-const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
+const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onError }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [loading, setLoading] = useState(true);
-  const [metric, setMetric] = useState<string>('mean_speed');
+  const [metric, setMetric] = useState<string>('mean_conge');
   const [selectedFeature, setSelectedFeature] = useState<any>(null);
   const [mapStyle, setMapStyle] = useState<string>('mapbox://styles/mapbox/light-v11');
   const [fullscreen, setFullscreen] = useState<boolean>(false);
@@ -25,44 +29,50 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
   const [colorScale, setColorScale] = useState<string[]>([]);
   
   const validateMapboxToken = (token: string) => {
+    if (!token || token.trim() === '') {
+      console.error("Mapbox token validation failed: Empty token");
+      return false;
+    }
+    
     const tokenParts = token.split('.');
     if (tokenParts.length !== 3) {
-      toast.error('Invalid Mapbox token format');
+      console.error("Mapbox token validation failed: Invalid format");
       return false;
     }
     return true;
   };
 
-  const token = apiKey || 'pk.eyJ1IjoidGdlcnRpbiIsImEiOiJYTW5sTVhRIn0.X4B5APkxkWVaiSg3KqMCaQ';
+  const token = apiKey || '';
 
   useEffect(() => {
     if (!mapContainer.current) return;
     
     if (!validateMapboxToken(token)) {
-      toast.error('Please provide a valid Mapbox access token');
+      const errorMsg = 'Please provide a valid Mapbox access token';
+      toast.error(errorMsg);
       setLoading(false);
+      if (onError) onError(errorMsg);
       return;
     }
     
     mapboxgl.accessToken = token;
     
-    console.log("Initializing map with token:", token);
+    console.log("Initializing Mapbox map");
     
     try {
       const { processedGeoJSON, metricStats: stats } = processGeoJSON(geoJSONData, metric);
       const colors = getColorScale(stats.min, stats.max, metric);
       
-      console.log(`Initial visualization for ${metric} with colors:`, colors);
-      
       setMetricStats(stats);
       setColorScale(colors);
       
+      // Create the map instance
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
         style: mapStyle,
-        center: [46.67, 24.71],
+        center: [46.73, 24.59], // Riyadh coordinates
         zoom: 11,
-        minZoom: 10,
+        minZoom: 9,
         maxZoom: 16,
         attributionControl: false,
         pitch: 45,
@@ -70,6 +80,7 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
       
       const mapInstance = map.current;
       
+      // Add navigation controls
       mapInstance.addControl(
         new mapboxgl.NavigationControl({
           visualizePitch: true,
@@ -77,13 +88,16 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
         'bottom-right'
       );
       
+      // Add attribution control
       mapInstance.addControl(new mapboxgl.AttributionControl({
         compact: true
       }), 'bottom-left');
       
+      // When the map is loaded, add the data
       mapInstance.on('load', () => {
-        console.log('Map loaded successfully');
+        console.log('Mapbox loaded successfully');
         
+        // Add GeoJSON source
         mapInstance.addSource('riyadh-hexagons', {
           type: 'geojson',
           data: processedGeoJSON,
@@ -91,9 +105,10 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
         
         console.log('Adding hexagon layers with features count:', processedGeoJSON.features.length);
         
+        // Process features to handle MultiPolygon geometries
         const features = processedGeoJSON.features.map((feature: any) => {
           const newFeature = { ...feature };
-          if (feature.geometry.type === 'MultiPolygon') {
+          if (feature.geometry && feature.geometry.type === 'MultiPolygon') {
             newFeature.geometry = {
               type: 'Polygon',
               coordinates: feature.geometry.coordinates[0]
@@ -102,16 +117,17 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
           return newFeature;
         });
         
+        // Update the source with processed features
         mapInstance.getSource('riyadh-hexagons').setData({
           type: 'FeatureCollection',
           features: features
         });
         
-        console.log('Converted features for rendering:', features.length);
-        
+        // Determine how to visualize the data
         let colorExpression;
         let heightExpression;
         
+        // For congestion, use a step function with quantiles
         if (metric.includes('conge') && stats.quantiles) {
           colorExpression = [
             'step',
@@ -120,7 +136,7 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
             stats.quantiles[1], colors[1],
             stats.quantiles[2], colors[2],
             stats.quantiles[3], colors[3],
-            stats.quantiles[4], colors[4]
+            stats.max, colors[4]
           ];
           
           heightExpression = [
@@ -130,11 +146,11 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
             stats.quantiles[1], 800,
             stats.quantiles[2], 1200,
             stats.quantiles[3], 1600,
-            stats.quantiles[4], 2000
+            stats.max, 2000
           ];
-          
-          console.log('Using quantile classification for congestion with breaks:', stats.quantiles);
-        } else {
+        } 
+        // For other metrics, use a linear interpolation
+        else {
           colorExpression = [
             'interpolate',
             ['linear'],
@@ -155,6 +171,7 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
           ];
         }
         
+        // Add 3D hexagons layer
         mapInstance.addLayer({
           id: 'hexagons-fill',
           type: 'fill-extrusion',
@@ -163,26 +180,29 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
             'fill-extrusion-color': colorExpression,
             'fill-extrusion-height': heightExpression,
             'fill-extrusion-base': 0,
-            'fill-extrusion-opacity': 0.8,
+            'fill-extrusion-opacity': 0.7,
           }
         });
         
+        // Add click interaction
         mapInstance.on('click', 'hexagons-fill', (e) => {
           if (!e.features || e.features.length === 0) return;
           
           const feature = e.features[0];
-          setSelectedFeature(feature);
+          setSelectedFeature({
+            properties: feature.properties
+          });
           
-          const coordinates = e.lngLat;
-          
+          // Fly to the clicked feature
           mapInstance.flyTo({
-            center: coordinates,
-            zoom: Math.max(mapInstance.getZoom(), 13.5),
+            center: e.lngLat,
+            zoom: Math.max(mapInstance.getZoom(), 13),
             duration: 1000,
             essential: true
           });
         });
         
+        // Change cursor on hover
         mapInstance.on('mouseenter', 'hexagons-fill', () => {
           mapInstance.getCanvas().style.cursor = 'pointer';
         });
@@ -196,27 +216,35 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
         toast.success(`Map data loaded successfully with ${processedGeoJSON.features.length} hexagons!`);
       });
       
-    } catch (error) {
+      // Handle map load errors
+      mapInstance.on('error', (e) => {
+        console.error('Mapbox error:', e);
+        if (onError) onError(`Mapbox error: ${e.error?.message || 'Unknown error'}`);
+      });
+      
+    } catch (error: any) {
       console.error('Map initialization error:', error);
-      toast.error('Failed to initialize map. Check your Mapbox token and network connection.');
+      const errorMsg = `Failed to initialize map: ${error.message || 'Unknown error'}`;
+      toast.error(errorMsg);
       setLoading(false);
+      if (onError) onError(errorMsg);
     }
 
+    // Cleanup function
     return () => {
       if (map.current) {
         map.current.remove();
       }
     };
-  }, [token, mapStyle, geoJSONData, metric]);
+  }, [token, mapStyle, geoJSONData]);
   
+  // Update visualization when metric changes
   useEffect(() => {
-    if (!map.current || !map.current.isStyleLoaded() || !map.current.getLayer('hexagons-fill')) return;
+    if (!map.current || !map.current.isStyleLoaded() || map.current.getSource('riyadh-hexagons') === undefined) return;
     
     try {
       const { metricStats: stats } = processGeoJSON(geoJSONData, metric);
       const colors = getColorScale(stats.min, stats.max, metric);
-      
-      console.log(`Updating visualization for ${metric} with colors:`, colors);
       
       setMetricStats(stats);
       setColorScale(colors);
@@ -232,7 +260,7 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
           stats.quantiles[1], colors[1],
           stats.quantiles[2], colors[2],
           stats.quantiles[3], colors[3],
-          stats.quantiles[4], colors[4]
+          stats.max, colors[4]
         ];
         
         heightExpression = [
@@ -242,10 +270,8 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
           stats.quantiles[1], 800,
           stats.quantiles[2], 1200,
           stats.quantiles[3], 1600,
-          stats.quantiles[4], 2000
+          stats.max, 2000
         ];
-        
-        console.log('Using quantile classification for congestion with breaks:', stats.quantiles);
       } else {
         colorExpression = [
           'interpolate',
@@ -267,15 +293,19 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
         ];
       }
       
-      map.current.setPaintProperty('hexagons-fill', 'fill-extrusion-color', colorExpression);
-      map.current.setPaintProperty('hexagons-fill', 'fill-extrusion-height', heightExpression);
+      if (map.current.getLayer('hexagons-fill')) {
+        map.current.setPaintProperty('hexagons-fill', 'fill-extrusion-color', colorExpression);
+        map.current.setPaintProperty('hexagons-fill', 'fill-extrusion-height', heightExpression);
+      }
       
       toast.success(`Visualizing: ${getMetricLabel(metric)}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating metric:', error);
+      toast.error(`Error updating visualization: ${error.message || 'Unknown error'}`);
     }
   }, [metric]);
   
+  // Handle fullscreen mode
   useEffect(() => {
     if (!mapContainer.current) return;
     
@@ -291,10 +321,6 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
     }
   }, [fullscreen]);
   
-  const handleMetricChange = (newMetric: string) => {
-    setMetric(newMetric);
-  };
-  
   const getMetricLabel = (metricKey: string): string => {
     const labels: Record<string, string> = {
       'mean_speed': 'Average Speed (km/h)',
@@ -306,6 +332,7 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
     return labels[metricKey] || metricKey;
   };
   
+  // Toggle between different map styles
   const toggleMapStyle = () => {
     const styles = [
       'mapbox://styles/mapbox/light-v11',
@@ -325,35 +352,26 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
   return (
     <div className="relative w-full h-screen overflow-hidden bg-background">
       {loading && (
-        <div className="loading-container">
-          <div className="loading-spinner" />
-          <p className="mt-4 text-muted-foreground animate-pulse">Loading map visualization...</p>
+        <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-50">
+          <div className="flex flex-col items-center">
+            <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4" />
+            <p className="text-muted-foreground animate-pulse">Loading map visualization...</p>
+            <p className="text-xs text-muted-foreground mt-2">
+              This may take a moment on first load
+            </p>
+          </div>
         </div>
       )}
       
-      <div ref={mapContainer} className="map-container" />
+      <div ref={mapContainer} className="w-full h-full" />
       
-      <div className="map-overlay">
-        <div className="chip mb-2">Traffic Analysis</div>
-        <h1 className="text-2xl font-bold tracking-tight mb-1">Riyadh Hexagonal Grid Analysis</h1>
-        <p className="text-muted-foreground text-sm mb-4">
-          Visualization of traffic metrics across {geoJSONData.features.length} hexagonal grid cells
-        </p>
-        <Separator className="my-3" />
-        <div className="info-row">
-          <span className="info-label">Current Metric</span>
-          <span className="info-value">{getMetricLabel(metric)}</span>
-        </div>
-        <div className="info-row">
-          <span className="info-label">Grid Cells</span>
-          <span className="info-value">{geoJSONData.features.length}</span>
-        </div>
-        <div className="info-row">
-          <span className="info-label">Area Coverage</span>
-          <span className="info-value">Central Riyadh</span>
-        </div>
-      </div>
+      {/* Map information overlay */}
+      <MapInfoOverlay 
+        featuresCount={geoJSONData.features.length}
+        metric={metric}
+      />
       
+      {/* Map legend */}
       {metricStats && colorScale.length > 0 && (
         <MapLegend 
           title={`${getMetricLabel(metric)}`}
@@ -365,111 +383,15 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
         />
       )}
       
-      <div className="map-control">
-        <Button 
-          variant="secondary" 
-          size="sm" 
-          className="flex items-center justify-between gap-2 w-full" 
-          onClick={toggleMapStyle}
-        >
-          <Layers size={16} />
-          <span>Change Style</span>
-        </Button>
-        
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button 
-              variant="secondary" 
-              size="sm" 
-              className="flex items-center justify-between gap-2 w-full"
-            >
-              <BarChart3 size={16} />
-              <span>Select Metric</span>
-              <ArrowDown size={14} />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-56 p-0" align="end">
-            <div className="p-2">
-              <Button 
-                variant={metric === 'mean_speed' ? 'default' : 'ghost'} 
-                className="w-full justify-start mb-1" 
-                size="sm"
-                onClick={() => handleMetricChange('mean_speed')}
-              >
-                Average Speed
-              </Button>
-              <Button 
-                variant={metric === 'mean_conge' ? 'default' : 'ghost'} 
-                className="w-full justify-start mb-1" 
-                size="sm"
-                onClick={() => handleMetricChange('mean_conge')}
-              >
-                Congestion Level
-              </Button>
-              <Button 
-                variant={metric === 'sum_vktkm' ? 'default' : 'ghost'} 
-                className="w-full justify-start mb-1" 
-                size="sm"
-                onClick={() => handleMetricChange('sum_vktkm')}
-              >
-                Vehicle Kilometers
-              </Button>
-              <Button 
-                variant={metric === 'sum_urban_' ? 'default' : 'ghost'} 
-                className="w-full justify-start" 
-                size="sm"
-                onClick={() => handleMetricChange('sum_urban_')}
-              >
-                Urban Road Length
-              </Button>
-            </div>
-          </PopoverContent>
-        </Popover>
-        
-        <Button 
-          variant="secondary" 
-          size="sm" 
-          className="flex items-center justify-between gap-2 w-full"
-          onClick={() => setFullscreen(!fullscreen)}
-        >
-          <Maximize2 size={16} />
-          <span>{fullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
-        </Button>
-        
-        {selectedFeature && (
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button 
-                variant="secondary" 
-                size="sm" 
-                className="flex items-center justify-between gap-2 w-full"
-              >
-                <Info size={16} />
-                <span>Grid {selectedFeature.properties.GRID_ID}</span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-72" align="end">
-              <div className="space-y-2">
-                <h3 className="font-semibold">Hexagon Grid {selectedFeature.properties.GRID_ID}</h3>
-                <Separator />
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="font-medium">Average Speed:</div>
-                  <div className="text-right">{selectedFeature.properties.mean_speed.toFixed(1)} km/h</div>
-                  
-                  <div className="font-medium">Congestion Level:</div>
-                  <div className="text-right">{selectedFeature.properties.mean_conge.toFixed(2)}</div>
-                  
-                  <div className="font-medium">Vehicle Kilometers:</div>
-                  <div className="text-right">{selectedFeature.properties.sum_vktkm.toFixed(0)} km</div>
-                  
-                  <div className="font-medium">Urban Road Length:</div>
-                  <div className="text-right">{selectedFeature.properties.sum_urban_.toFixed(0)} m</div>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-        )}
-      </div>
+      {/* Map controls */}
+      <MapControls 
+        metric={metric}
+        onMetricChange={setMetric}
+        onStyleChange={toggleMapStyle}
+        onFullscreenToggle={() => setFullscreen(!fullscreen)}
+        fullscreen={fullscreen}
+        selectedFeature={selectedFeature}
+      />
     </div>
   );
 };

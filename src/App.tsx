@@ -7,6 +7,9 @@ import { HashRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
+// Import Mapbox CSS
+import 'mapbox-gl/dist/mapbox-gl.css';
+
 const queryClient = new QueryClient();
 
 const App = () => (
