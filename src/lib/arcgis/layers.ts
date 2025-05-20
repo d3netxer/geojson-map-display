@@ -99,7 +99,7 @@ export const createGeoJSONLayer = (
             size: baseHeight,
             material: { 
               color: colors[0],
-              transparency: 20  // 20% transparent
+              transparency: 90  // 90% transparent
             }
           }
         ]
@@ -193,7 +193,7 @@ export const updateLayerVisualization = (
               size: baseHeight,
               material: { 
                 color: colors[0],
-                transparency: 20 // Set to 20% transparent
+                transparency: 90 // Set to 90% transparent
               }
             }
           ]
