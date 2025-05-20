@@ -1,4 +1,3 @@
-
 import { processGeoJSON } from '@/lib/mapUtils';
 import { MapStats } from './types';
 import GeoJSONLayer from '@arcgis/core/layers/GeoJSONLayer';
@@ -106,7 +105,7 @@ export const createGeoJSONLayer = (
       },
       visualVariables: visualVariables
     } as any,
-    opacity: 0.95, // Increased opacity from 0.85 to 0.95 for better visibility
+    opacity: 0.99, // Increased opacity to 0.99 for maximum visibility
     popupEnabled: false,
     outFields: ["*"]
   });
@@ -184,12 +183,8 @@ export const updateLayerVisualization = (
   (renderer as any).visualVariables = visualVariables;
   layer.renderer = renderer;
   
-  // Update the layer's opacity for better visibility
-  if (metric === 'mean_conge') {
-    layer.opacity = 0.95; // Increased opacity from 0.85 to 0.95 for congestion
-  } else {
-    layer.opacity = 0.90;  // Increased opacity from 0.7 to 0.90 for other metrics
-  }
+  // Update the layer's opacity to 0.99 for maximum visibility for all metrics
+  layer.opacity = 0.99;
   
   // Refresh the layer
   layer.refresh();
