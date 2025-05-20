@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Toaster } from "sonner";
 import { toast } from "sonner";
@@ -22,7 +21,7 @@ const DEMO_API_KEYS = [
 ];
 
 // Choose a random demo key to avoid rate limiting issues
-const getRandomDemoKey = () => DEMO_API_KEYS[Math.floor(Math.random() * DEMO_API_KEYS.length)];
+const getRandomDemoKey = () => DEMO_API_KEYS[0]; // Always use the first key (your provided key)
 
 const Index = () => {
   const [apiKey, setApiKey] = useState<string>('');
