@@ -1,3 +1,4 @@
+
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { toast } from 'sonner';
@@ -210,7 +211,7 @@ export const useMapbox = ({
       let uniqueQuantiles = Array.from(new Set(stats.quantiles)).sort((a: number, b: number) => a - b);
       
       // Ensure the first value is greater than min (to avoid duplicate step values)
-      if (uniqueQuantiles[0] <= stats.min) {
+      if (uniqueQuantiles.length > 0 && uniqueQuantiles[0] <= stats.min) {
         uniqueQuantiles = uniqueQuantiles.filter((q: number) => q > stats.min);
       }
       
@@ -229,6 +230,8 @@ export const useMapbox = ({
           prevValue = q;
         }
       }
+      
+      console.log(`Quantiles for ${metric}:`, processedQuantiles);
       
       // Create step pairs ensuring strictly ascending order
       const stepPairs: (number | string)[] = [];
