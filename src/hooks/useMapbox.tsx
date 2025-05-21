@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { toast } from 'sonner';
@@ -215,19 +214,22 @@ export const useMapbox = ({
         uniqueQuantiles = uniqueQuantiles.filter((q: number) => q > stats.min);
       }
       
-      // Ensure quantiles have at least a small difference between them
+      // Ensure quantiles are unique and strictly ascending
       const processedQuantiles: number[] = [];
-      let prevValue = stats.min;
+      let prevValue: number = stats.min;
       
       for (const q of uniqueQuantiles) {
+        // Make sure q is treated as a number
+        const qAsNumber = Number(q);
+        
         // Add a small epsilon if the value is too close to previous
-        if (q - prevValue < 0.001) {
+        if (qAsNumber - prevValue < 0.001) {
           const adjustedValue = prevValue + 0.001;
           processedQuantiles.push(adjustedValue);
           prevValue = adjustedValue;
         } else {
-          processedQuantiles.push(q);
-          prevValue = q;
+          processedQuantiles.push(qAsNumber);
+          prevValue = qAsNumber;
         }
       }
       
