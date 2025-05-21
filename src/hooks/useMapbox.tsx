@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { toast } from 'sonner';
@@ -232,7 +231,7 @@ export const useMapbox = ({
       }
       
       // Create step pairs ensuring strictly ascending order
-      const stepPairs = [];
+      const stepPairs: (number | string)[] = [];
       for (let i = 0; i < Math.min(processedQuantiles.length, colors.length - 1); i++) {
         stepPairs.push(processedQuantiles[i], colors[i + 1]);
       }
