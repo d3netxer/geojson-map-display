@@ -163,7 +163,7 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
             'fill-extrusion-color': colorExpression,
             'fill-extrusion-height': heightExpression,
             'fill-extrusion-base': 0,
-            'fill-extrusion-opacity': 0.8,
+            'fill-extrusion-opacity': 0.5, // Changed from 0.8 to 0.5 for more transparency
           }
         });
         
