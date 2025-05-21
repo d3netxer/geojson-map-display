@@ -19,7 +19,7 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
   const [loading, setLoading] = useState(true);
   const [metric, setMetric] = useState<string>('mean_speed');
   const [selectedFeature, setSelectedFeature] = useState<any>(null);
-  const [mapStyle, setMapStyle] = useState<string>('mapbox://styles/mapbox/light-v11');
+  const [mapStyle, setMapStyle] = useState<string>('mapbox://styles/mapbox/streets-v12');
   const [fullscreen, setFullscreen] = useState<boolean>(false);
   const [metricStats, setMetricStats] = useState<any>(null);
   const [colorScale, setColorScale] = useState<string[]>([]);
@@ -308,9 +308,9 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
   
   const toggleMapStyle = () => {
     const styles = [
+      'mapbox://styles/mapbox/streets-v12',
       'mapbox://styles/mapbox/light-v11',
       'mapbox://styles/mapbox/dark-v11',
-      'mapbox://styles/mapbox/streets-v12',
       'mapbox://styles/mapbox/satellite-streets-v12'
     ];
     
@@ -318,7 +318,7 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
     const nextIndex = (currentIndex + 1) % styles.length;
     setMapStyle(styles[nextIndex]);
     
-    const styleNames = ['Light', 'Dark', 'Streets', 'Satellite'];
+    const styleNames = ['Standard', 'Light', 'Dark', 'Satellite'];
     toast.success(`Map style changed to ${styleNames[nextIndex]}`);
   };
 
