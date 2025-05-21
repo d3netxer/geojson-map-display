@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Toaster } from "sonner";
 import { toast } from "sonner";
@@ -22,7 +23,7 @@ const Index = () => {
     const currentDataset = import.meta.env.VITE_GEOJSON_SOURCE || 'default';
     setDatasetSource(currentDataset);
     
-    toast.info(`Using ${currentDataset} GeoJSON dataset in WGS84 format. To switch, set VITE_GEOJSON_SOURCE environment variable.`);
+    // Removed the toast.info notification about dataset format
   }, []);
 
   const handleApiKeySubmit = () => {
@@ -125,3 +126,4 @@ const Index = () => {
 };
 
 export default Index;
+
