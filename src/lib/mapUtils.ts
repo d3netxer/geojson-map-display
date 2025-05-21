@@ -1,136 +1,149 @@
-// Function to process GeoJSON data for visualization
-export const processGeoJSON = (geojson: any, metric: string) => {
-  if (!geojson || !geojson.features) {
-    console.error('Invalid GeoJSON data provided');
-    return { processedGeoJSON: { type: 'FeatureCollection', features: [] }, metricStats: {} };
-  }
 
-  // Deep clone the GeoJSON to avoid mutating the original
-  const processedGeoJSON = JSON.parse(JSON.stringify(geojson));
+/**
+ * Helper functions for processing GeoJSON data and handling map-related operations
+ */
 
-  // Calculate statistics for the selected metric
-  const values = processedGeoJSON.features
-    .map((feature: any) => feature.properties[metric])
-    .filter((val: any) => val !== undefined && val !== null);
+interface MetricStats {
+  min: number;
+  max: number;
+  range: number;
+  avg: number;
+  quantiles?: number[];
+}
 
-  if (values.length === 0) {
-    console.error(`No valid values found for metric: ${metric}`);
-    return { 
-      processedGeoJSON, 
-      metricStats: { min: 0, max: 1, mean: 0, range: 1, quantiles: [0.2, 0.4, 0.6, 0.8] } 
-    };
-  }
-
-  // Get min, max, mean, and range
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min > 0 ? max - min : 1; // Avoid division by zero
-  const mean = values.reduce((a: number, b: number) => a + b, 0) / values.length;
-
-  // Calculate quantiles for better visualization
-  // Sort values and ensure they're strictly ascending
-  const sortedValues = [...values].sort((a, b) => a - b);
+/**
+ * Process the GeoJSON data to ensure it's properly formatted and calculate stats for a given metric
+ */
+export function processGeoJSON(geojson: any, metric: string = 'mean_speed') {
+  const features = geojson.features;
   
-  // Ensure we have unique values for quantiles
-  const quantileIndices = [
-    Math.floor(sortedValues.length * 0.2),
-    Math.floor(sortedValues.length * 0.4),
-    Math.floor(sortedValues.length * 0.6),
-    Math.floor(sortedValues.length * 0.8),
-  ];
-
-  // Get quantile values
-  const rawQuantiles = quantileIndices.map(index => sortedValues[index]);
+  // Extract metric values for calculating min/max
+  const metricValues = features.map((f: any) => f.properties[metric]).filter((val: any) => val !== undefined && !isNaN(val));
   
-  // Ensure quantiles are unique and strictly ascending
-  let prevValue = min;
-  const processedQuantiles = [];
+  const min = Math.min(...metricValues);
+  const max = Math.max(...metricValues);
+  const range = max - min;
+  const avg = metricValues.reduce((sum: number, val: number) => sum + val, 0) / metricValues.length;
   
-  for (const q of rawQuantiles) {
-    // Skip if the same as previous or less than min
-    if (q > prevValue) {
-      processedQuantiles.push(q);
-      prevValue = q;
-    } else {
-      // Add a small increment to ensure ascending order
-      const adjustedValue = prevValue + 0.001;
-      processedQuantiles.push(adjustedValue);
-      prevValue = adjustedValue;
+  // Calculate quantiles for congestion metric (5 quantiles for 5 color classes)
+  let quantiles: number[] | undefined = undefined;
+  
+  if (metric.includes('conge')) {
+    // Sort values for quantile calculation
+    const sortedValues = [...metricValues].sort((a, b) => a - b);
+    
+    // Ensure we have unique, ascending values for the quantiles
+    // This is critical for Mapbox's step expression which requires strictly ascending values
+    const length = sortedValues.length;
+    quantiles = [
+      min,
+      sortedValues[Math.floor(length * 0.2)],
+      sortedValues[Math.floor(length * 0.4)],
+      sortedValues[Math.floor(length * 0.6)],
+      sortedValues[Math.floor(length * 0.8)],
+      max
+    ];
+    
+    // Ensure strictly ascending order by adjusting any identical values
+    for (let i = 1; i < quantiles.length; i++) {
+      if (quantiles[i] <= quantiles[i-1]) {
+        // Add a small epsilon to make it strictly greater than the previous value
+        quantiles[i] = quantiles[i-1] + 0.000001;
+      }
     }
+    
+    console.log('Quantiles for congestion:', quantiles);
   }
-
-  console.log(`Quantiles for ${metric}:`, processedQuantiles);
-
-  // Return processed GeoJSON and statistics
+  
+  // Copy the GeoJSON to avoid mutating the original
+  const processedGeoJSON = JSON.parse(JSON.stringify(geojson));
+  
+  // Ensure each feature has the metric property as a number
+  processedGeoJSON.features = features.map((feature: any) => {
+    // Make a copy of the feature
+    const newFeature = { ...feature };
+    
+    // Ensure the metric value is a number
+    if (newFeature.properties[metric] === undefined || isNaN(newFeature.properties[metric])) {
+      newFeature.properties[metric] = min;
+    }
+    
+    return newFeature;
+  });
+  
   return {
     processedGeoJSON,
-    metricStats: {
-      min,
-      max,
-      mean,
-      range,
-      quantiles: processedQuantiles
-    }
+    metricStats: { min, max, range, avg, quantiles }
   };
-};
+}
 
-// Function to get color scale based on metric
-export const getColorScale = (min: number, max: number, metric: string) => {
-  // Different color schemes for different metrics
-  if (metric === 'mean_speed') {
-    // Speed: green (slow) to red (fast)
-    return ['#198754', '#5cb85c', '#6c757d', '#fd7e14', '#dc3545'];
-  } else if (metric === 'mean_conge') {
-    // Congestion: green (low) to red (high) - more distinct color gradient
-    return ['#E5F5E0', '#C0E5C8', '#86C49D', '#41A275', '#006C4A'];
-  } else if (metric === 'sum_vktkm') {
-    // Vehicle kilometers: light to dark blue
-    return ['#cfe2ff', '#9ec5fe', '#6ea8fe', '#3d8bfd', '#0d6efd'];
-  } else {
-    // Default: purple gradient
-    return ['#e2d9f3', '#c5b3e6', '#a98eda', '#8c68cd', '#6f42c1'];
+/**
+ * Generate a color scale for the given metric range
+ */
+export function getColorScale(min: number, max: number, metric?: string) {
+  // Different color scales based on metric types
+  const colorScales: Record<string, string[]> = {
+    // Cool blue scale (good for speed)
+    blue: ['#cfe2f3', '#9fc5e8', '#6fa8dc', '#3d85c6', '#0b5394'],
+    
+    // Green to red scale (good for congestion - red is high congestion, green is low congestion)
+    congestion: ['#F2FCE2', '#A4D86E', '#FFD166', '#F17A3A', '#EA384C'],
+    
+    // Green scale (good for green metrics)
+    green: ['#d9ead3', '#b6d7a8', '#93c47d', '#6aa84f', '#38761d'],
+    
+    // Purple scale (good for urban metrics)
+    purple: ['#d9d2e9', '#b4a7d6', '#8e7cc3', '#674ea7', '#351c75'],
+  };
+  
+  // Select color scale based on metric name if provided
+  if (metric) {
+    if (metric.includes('conge')) {
+      return colorScales.congestion;
+    } else if (metric.includes('urban_')) {
+      return colorScales.purple;
+    } else if (metric.includes('vktkm')) {
+      return colorScales.green;
+    }
   }
-};
+  
+  // Default to blue scale for speed and other metrics
+  return colorScales.blue;
+}
 
-// Function to format metric values for display with safe handling for undefined/null
-export const formatValue = (value: number | undefined | null, metric: string) => {
-  // Return placeholder if value is undefined or null
-  if (value === undefined || value === null) {
-    return 'N/A';
-  }
-
-  if (metric === 'mean_speed') {
+/**
+ * Format a value with the appropriate units
+ */
+export function formatValue(value: number, metric: string): string {
+  if (metric.includes('speed')) {
     return `${value.toFixed(1)} km/h`;
-  } else if (metric === 'mean_conge') {
+  } else if (metric.includes('conge')) {
     return value.toFixed(2);
-  } else if (metric === 'sum_vktkm') {
+  } else if (metric.includes('vktkm')) {
     return `${value.toFixed(0)} km`;
-  } else if (metric === 'sum_urban_') {
+  } else if (metric.includes('urban_')) {
     return `${value.toFixed(0)} m`;
+  } else if (metric.includes('segme')) {
+    return `${value.toFixed(1)} m`;
   }
-  return value.toFixed(2);
-};
+  
+  return value.toFixed(1);
+}
 
-// Function to calculate height multiplier based on metric type
-export const getHeightMultiplier = (metric: string, value: number, min: number, max: number) => {
-  // Avoid division by zero
-  const normalizedValue = max > min ? (value - min) / (max - min) : 0.5;
-  
-  // For congestion, we want higher congestion to have taller hexagons
-  if (metric === 'mean_conge') {
-    // Scale from 300 to 3000 for better visibility
-    return 300 + (normalizedValue * 2700);
-  } 
-  
-  // For speed, higher speeds should be taller
-  else if (metric === 'mean_speed') {
-    // Scale from 200 to 2000
-    return 200 + (normalizedValue * 1800);
+/**
+ * Get height multiplier based on metric type - useful for 3D visualization
+ * For congestion, higher values should be taller
+ */
+export function getHeightMultiplier(value: number, min: number, max: number, metric?: string): number {
+  // For congestion, higher values = taller hexagons
+  if (metric && metric.includes('conge')) {
+    const range = max - min;
+    if (range === 0) return 1;
+    return 1 + ((value - min) / range) * 2; // Scale factor of 2 to make the difference more noticeable
   }
   
-  // For volumes (vkt, urban road length), higher volumes = taller
-  else {
-    // Scale from 300 to 2500
-    return 300 + (normalizedValue * 2200);
-  }
-};
+  // For other metrics, higher values get taller
+  const range = max - min;
+  if (range === 0) return 1;
+  return 1 + ((value - min) / range);
+}
