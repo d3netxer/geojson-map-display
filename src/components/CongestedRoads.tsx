@@ -12,11 +12,11 @@ interface CongestedRoadsProps {
 const CongestedRoads: React.FC<CongestedRoadsProps> = ({ roads, onFocusRoad }) => {
   return (
     <div className="bg-white/90 backdrop-blur-sm p-4 rounded-lg shadow-md max-h-[80vh] overflow-auto">
-      <h3 className="text-lg font-semibold mb-2">Most Congested Roads</h3>
+      <h3 className="text-lg font-semibold mb-2">Most Congested Roads Analysis</h3>
       
       {roads.length === 0 ? (
         <div className="py-4 text-center text-muted-foreground">
-          <p>No road data available. Click "Analyze Roads" to find congested roads.</p>
+          <p>Click "Analyze Roads" to generate a list of congested roads based on the hexagon data.</p>
         </div>
       ) : (
         <Table>
