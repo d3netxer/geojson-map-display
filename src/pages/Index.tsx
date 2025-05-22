@@ -33,25 +33,44 @@ const Index = () => {
   }, []);
 
   const handleApiKeySubmit = () => {
-    setMapReady(false);
-    // Brief timeout to allow the map to re-initialize with the new API key
-    setTimeout(() => {
-      setMapReady(true);
+    if (mapRef) {
+      // Update the map's access token directly instead of remounting
+      if (mapRef.updateMapboxToken) {
+        mapRef.updateMapboxToken(apiKey);
+        toast.success('API key updated successfully');
+      } else {
+        // Fall back to remounting if updateMapboxToken isn't available
+        setMapReady(false);
+        setTimeout(() => {
+          setMapReady(true);
+        }, 100);
+      }
       setShowApiKeyModal(false);
-    }, 100);
+    }
   };
 
   // Switch between available datasets
   const toggleDataset = () => {
     const newDataset = datasetSource === 'default' ? 'custom' : 'default';
-    setMapReady(false);
     
-    setTimeout(() => {
+    // Update dataset without remounting the map
+    if (mapRef && mapRef.updateGeoJSONData) {
+      const newGeoJSON = geoJSONDatasets[newDataset as keyof typeof geoJSONDatasets];
+      mapRef.updateGeoJSONData(newGeoJSON);
+      setCurrentGeoJSON(newGeoJSON);
       setDatasetSource(newDataset);
-      setCurrentGeoJSON(geoJSONDatasets[newDataset as keyof typeof geoJSONDatasets]);
-      setMapReady(true);
-      toast.success(`Switched to ${newDataset} dataset (${geoJSONDatasets[newDataset as keyof typeof geoJSONDatasets].features.length} features)`);
-    }, 100);
+      toast.success(`Switched to ${newDataset} dataset (${newGeoJSON.features.length} features)`);
+    } else {
+      // Fall back to remounting if updateGeoJSONData isn't available
+      setMapReady(false);
+      
+      setTimeout(() => {
+        setDatasetSource(newDataset);
+        setCurrentGeoJSON(geoJSONDatasets[newDataset as keyof typeof geoJSONDatasets]);
+        setMapReady(true);
+        toast.success(`Switched to ${newDataset} dataset (${geoJSONDatasets[newDataset as keyof typeof geoJSONDatasets].features.length} features)`);
+      }, 100);
+    }
   };
 
   // Focus on a specific feature on the map

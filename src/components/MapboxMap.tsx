@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { ArrowDown, Layers, Maximize2, BarChart3, Info } from 'lucide-react';
@@ -28,6 +27,8 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
   const [metricStats, setMetricStats] = useState<any>(null);
   const [colorScale, setColorScale] = useState<string[]>([]);
   const [roadLayers, setRoadLayers] = useState<string[]>([]);
+  const [currentGeoJSON, setCurrentGeoJSON] = useState<any>(geoJSONData);
+  const [currentToken, setCurrentToken] = useState<string>(apiKey || 'pk.eyJ1IjoidGdlcnRpbiIsImEiOiJYTW5sTVhRIn0.X4B5APkxkWVaiSg3KqMCaQ');
   
   const validateMapboxToken = (token: string) => {
     const tokenParts = token.split('.');
@@ -38,23 +39,136 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
     return true;
   };
 
-  const token = apiKey || 'pk.eyJ1IjoidGdlcnRpbiIsImEiOiJYTW5sTVhRIn0.X4B5APkxkWVaiSg3KqMCaQ';
+  // Update GeoJSON data without remounting the map
+  const updateGeoJSONData = (newGeoJSON: any) => {
+    if (!map.current || !map.current.isStyleLoaded()) {
+      console.error('Map not ready for GeoJSON update');
+      return false;
+    }
+    
+    try {
+      setCurrentGeoJSON(newGeoJSON);
+      const { processedGeoJSON, metricStats: stats } = processGeoJSON(newGeoJSON, metric);
+      const colors = getColorScale(stats.min, stats.max, metric);
+      
+      console.log(`Updating GeoJSON data with ${newGeoJSON.features.length} features`);
+      
+      setMetricStats(stats);
+      setColorScale(colors);
+      
+      // Update the source data
+      if (map.current.getSource('riyadh-hexagons')) {
+        const features = processedGeoJSON.features.map((feature: any) => {
+          const newFeature = { ...feature };
+          if (feature.geometry.type === 'MultiPolygon') {
+            newFeature.geometry = {
+              type: 'Polygon',
+              coordinates: feature.geometry.coordinates[0]
+            };
+          }
+          return newFeature;
+        });
+        
+        (map.current.getSource('riyadh-hexagons') as mapboxgl.GeoJSONSource).setData({
+          type: 'FeatureCollection',
+          features: features
+        });
+        
+        // Update the style expressions based on the new data
+        updateMapStyleExpressions(stats);
+        
+        return true;
+      } else {
+        console.error('Source not found');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error updating GeoJSON data:', error);
+      return false;
+    }
+  };
+  
+  // Update the Mapbox token without remounting
+  const updateMapboxToken = (newToken: string) => {
+    if (!validateMapboxToken(newToken)) {
+      return false;
+    }
+    
+    setCurrentToken(newToken);
+    // Unfortunately, Mapbox GL JS doesn't allow changing the access token after initialization
+    // We would need to recreate the map to use a new token
+    toast.info('The map will use the new token for API requests');
+    return true;
+  };
+  
+  // Update the map style expressions based on metric stats
+  const updateMapStyleExpressions = (stats: any) => {
+    if (!map.current || !map.current.isStyleLoaded()) return;
+    
+    const colors = getColorScale(stats.min, stats.max, metric);
+    let colorExpression;
+    let heightExpression;
+    
+    if (metric.includes('conge') && stats.quantiles) {
+      colorExpression = [
+        'step',
+        ['get', metric],
+        colors[0],
+        stats.quantiles[1], colors[1],
+        stats.quantiles[2], colors[2],
+        stats.quantiles[3], colors[3],
+        stats.quantiles[4], colors[4]
+      ];
+      
+      heightExpression = [
+        'step',
+        ['get', metric],
+        500,
+        stats.quantiles[1], 800,
+        stats.quantiles[2], 1200,
+        stats.quantiles[3], 1600,
+        stats.quantiles[4], 2000
+      ];
+    } else {
+      colorExpression = [
+        'interpolate',
+        ['linear'],
+        ['get', metric],
+        stats.min, colors[0],
+        stats.min + (stats.range * 0.25), colors[1],
+        stats.min + (stats.range * 0.5), colors[2],
+        stats.min + (stats.range * 0.75), colors[3],
+        stats.max, colors[4],
+      ];
+      
+      heightExpression = [
+        'interpolate',
+        ['linear'],
+        ['get', metric],
+        stats.min, 500,
+        stats.max, 2000
+      ];
+    }
+    
+    map.current.setPaintProperty('hexagons-fill', 'fill-extrusion-color', colorExpression);
+    map.current.setPaintProperty('hexagons-fill', 'fill-extrusion-height', heightExpression);
+  };
 
   useEffect(() => {
     if (!mapContainer.current) return;
     
-    if (!validateMapboxToken(token)) {
+    if (!validateMapboxToken(currentToken)) {
       toast.error('Please provide a valid Mapbox access token');
       setLoading(false);
       return;
     }
     
-    mapboxgl.accessToken = token;
+    mapboxgl.accessToken = currentToken;
     
-    console.log("Initializing map with token:", token);
+    console.log("Initializing map with token:", currentToken);
     
     try {
-      const { processedGeoJSON, metricStats: stats } = processGeoJSON(geoJSONData, metric);
+      const { processedGeoJSON, metricStats: stats } = processGeoJSON(currentGeoJSON, metric);
       const colors = getColorScale(stats.min, stats.max, metric);
       
       console.log(`Initial visualization for ${metric} with colors:`, colors);
@@ -302,6 +416,12 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
             findCongestedRoads: async (mapboxToken: string) => {
               return await findAndRenderCongestedRoads(mapboxToken);
             },
+            updateGeoJSONData: (newData: any) => {
+              return updateGeoJSONData(newData);
+            },
+            updateMapboxToken: (newToken: string) => {
+              return updateMapboxToken(newToken);
+            },
             flyTo: mapInstance.flyTo.bind(mapInstance)
           };
           
@@ -322,13 +442,13 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
         map.current.remove();
       }
     };
-  }, [token, mapStyle, geoJSONData, onMapInit]);
+  }, [currentToken, mapStyle]);
   
   useEffect(() => {
     if (!map.current || !map.current.isStyleLoaded() || !map.current.getLayer('hexagons-fill')) return;
     
     try {
-      const { metricStats: stats } = processGeoJSON(geoJSONData, metric);
+      const { metricStats: stats } = processGeoJSON(currentGeoJSON, metric);
       const colors = getColorScale(stats.min, stats.max, metric);
       
       console.log(`Updating visualization for ${metric} with colors:`, colors);
@@ -336,54 +456,7 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
       setMetricStats(stats);
       setColorScale(colors);
       
-      let colorExpression;
-      let heightExpression;
-      
-      if (metric.includes('conge') && stats.quantiles) {
-        colorExpression = [
-          'step',
-          ['get', metric],
-          colors[0],
-          stats.quantiles[1], colors[1],
-          stats.quantiles[2], colors[2],
-          stats.quantiles[3], colors[3],
-          stats.quantiles[4], colors[4]
-        ];
-        
-        heightExpression = [
-          'step',
-          ['get', metric],
-          500,
-          stats.quantiles[1], 800,
-          stats.quantiles[2], 1200,
-          stats.quantiles[3], 1600,
-          stats.quantiles[4], 2000
-        ];
-        
-        console.log('Using quantile classification for congestion with breaks:', stats.quantiles);
-      } else {
-        colorExpression = [
-          'interpolate',
-          ['linear'],
-          ['get', metric],
-          stats.min, colors[0],
-          stats.min + (stats.range * 0.25), colors[1],
-          stats.min + (stats.range * 0.5), colors[2],
-          stats.min + (stats.range * 0.75), colors[3],
-          stats.max, colors[4],
-        ];
-        
-        heightExpression = [
-          'interpolate',
-          ['linear'],
-          ['get', metric],
-          stats.min, 500,
-          stats.max, 2000
-        ];
-      }
-      
-      map.current.setPaintProperty('hexagons-fill', 'fill-extrusion-color', colorExpression);
-      map.current.setPaintProperty('hexagons-fill', 'fill-extrusion-height', heightExpression);
+      updateMapStyleExpressions(stats);
       
       toast.success(`Visualizing: ${getMetricLabel(metric)}`);
     } catch (error) {
@@ -563,7 +636,7 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
         <div className="chip mb-2">Traffic Analysis</div>
         <h1 className="text-2xl font-bold tracking-tight mb-1">Riyadh Hexagonal Grid Analysis</h1>
         <p className="text-muted-foreground text-sm mb-4">
-          Visualization of traffic metrics across {geoJSONData.features.length} hexagonal grid cells
+          Visualization of traffic metrics across {currentGeoJSON.features.length} hexagonal grid cells
         </p>
         <Separator className="my-3" />
         <div className="info-row">
@@ -572,7 +645,7 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
         </div>
         <div className="info-row">
           <span className="info-label">Grid Cells</span>
-          <span className="info-value">{geoJSONData.features.length}</span>
+          <span className="info-value">{currentGeoJSON.features.length}</span>
         </div>
         <div className="info-row">
           <span className="info-label">Area Coverage</span>
