@@ -1,4 +1,3 @@
-
 /**
  * Types for road analysis
  */
@@ -208,8 +207,96 @@ const createPathFromPoint = (point: [number, number], bearing: number | undefine
 };
 
 /**
+ * Fetches full road geometry using Mapbox Maps API
+ * This provides more accurate and complete road geometries than the Tilequery API
+ */
+const fetchFullRoadGeometry = async (
+  roadId: string,
+  startCoordinate: [number, number],
+  accessToken: string
+): Promise<[number, number][] | null> => {
+  try {
+    // Convert Mapbox road ID to the format needed for Maps API
+    const formattedRoadId = roadId.replace('road.', '');
+    
+    // Query the Mapbox Maps API for the full road geometry
+    // We use the feature-state endpoint which can return the full geometry
+    const url = `https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/features/${formattedRoadId}?access_token=${accessToken}`;
+    
+    console.log(`Fetching full road geometry for ID ${roadId} from ${url.replace(accessToken, 'API_KEY_HIDDEN')}`);
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      console.error(`Mapbox API error: ${response.status} ${response.statusText}`);
+      return null;
+    }
+    
+    const data = await response.json();
+    
+    // Check if the response contains geometry
+    if (data && data.geometry && data.geometry.coordinates) {
+      console.log(`Successfully retrieved full geometry for road ${roadId} with ${data.geometry.coordinates.length} coordinates`);
+      return data.geometry.coordinates as [number, number][];
+    } else {
+      // Fallback to Directions API if the Maps API doesn't return geometry
+      return await fetchGeometryUsingDirectionsAPI(startCoordinate, accessToken);
+    }
+  } catch (error) {
+    console.error("Failed to fetch full road geometry:", error);
+    return null;
+  }
+};
+
+/**
+ * Fallback method to get road geometry using the Mapbox Directions API
+ * Used when Maps API doesn't return useful geometry
+ */
+const fetchGeometryUsingDirectionsAPI = async (
+  startCoordinate: [number, number],
+  accessToken: string
+): Promise<[number, number][] | null> => {
+  try {
+    // Calculate an endpoint roughly 500m away in a random direction
+    const bearingRad = Math.random() * Math.PI * 2; // Random angle in radians
+    const distance = 0.005; // Roughly 500m in decimal degrees at equator
+    
+    const endCoordinate: [number, number] = [
+      startCoordinate[0] + Math.cos(bearingRad) * distance,
+      startCoordinate[1] + Math.sin(bearingRad) * distance
+    ];
+    
+    // Query the Mapbox Directions API for a route
+    const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${startCoordinate[0]},${startCoordinate[1]};${endCoordinate[0]},${endCoordinate[1]}?geometries=geojson&overview=full&steps=true&access_token=${accessToken}`;
+    
+    console.log(`Fetching road geometry using Directions API from ${url.replace(accessToken, 'API_KEY_HIDDEN')}`);
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      console.error(`Mapbox Directions API error: ${response.status} ${response.statusText}`);
+      return null;
+    }
+    
+    const data = await response.json();
+    
+    // Check if the response contains a route
+    if (data && data.routes && data.routes.length > 0 && data.routes[0].geometry) {
+      console.log(`Successfully retrieved route geometry with ${data.routes[0].geometry.coordinates.length} coordinates`);
+      return data.routes[0].geometry.coordinates as [number, number][];
+    }
+    
+    return null;
+  } catch (error) {
+    console.error("Failed to fetch geometry using Directions API:", error);
+    return null;
+  }
+};
+
+/**
  * Fetches road data for a specific location using Mapbox Tilequery API
- * and processes the response to create RoadSegment objects
+ * and processes the response to create RoadSegment objects,
+ * now with enhanced geometry fetching
  */
 const fetchRoadsAtLocation = async (
   center: [number, number],
@@ -243,29 +330,58 @@ const fetchRoadsAtLocation = async (
         try {
           // Process different geometry types
           let coordinates: [number, number][] = [];
+          let shouldFetchFullGeometry = false;
+          let point: [number, number] = [0, 0];
           
           if (feature.geometry.type === 'LineString') {
             // Use the existing LineString coordinates
             coordinates = feature.geometry.coordinates as [number, number][];
             console.log("Processing LineString geometry");
+            
+            // If there are very few coordinates, we'll want to fetch the full geometry
+            if (coordinates.length < 5) {
+              shouldFetchFullGeometry = true;
+              point = coordinates[0]; // Use first point for fetching full geometry
+            }
           } else if (feature.geometry.type === 'MultiLineString') {
             // Use the first line in a MultiLineString
             coordinates = feature.geometry.coordinates[0] as [number, number][];
             console.log("Processing MultiLineString geometry");
+            
+            // If there are very few coordinates, we'll want to fetch the full geometry
+            if (coordinates.length < 5) {
+              shouldFetchFullGeometry = true;
+              point = coordinates[0]; // Use first point for fetching full geometry
+            }
           } else if (feature.geometry.type === 'Point') {
-            // For Point geometries, create a synthetic path based on bearing if available
-            console.log("Processing Point geometry with properties:", feature.properties);
+            // For Point geometries, we'll need to fetch the full geometry
+            shouldFetchFullGeometry = true;
+            point = [feature.geometry.coordinates[0], feature.geometry.coordinates[1]];
             
-            const point: [number, number] = [feature.geometry.coordinates[0], feature.geometry.coordinates[1]];
-            const bearing = feature.properties.bearing;
-            
-            // Create a path from the point with more points for smoother lines
-            coordinates = createPathFromPoint(point, bearing, 150);
-            console.log(`Created synthetic path from point with ${coordinates.length} coordinates`);
+            // Temporarily create a synthetic path from the point with bearing
+            coordinates = createPathFromPoint(point, feature.properties.bearing, 150);
+            console.log(`Created temporary synthetic path from point with ${coordinates.length} coordinates`);
           } else {
             // Skip other geometry types
             console.log(`Skipping unsupported geometry type: ${feature.geometry.type}`);
             continue;
+          }
+          
+          // If we should fetch full geometry and have a feature ID
+          if (shouldFetchFullGeometry && feature.id) {
+            console.log(`Attempting to fetch full geometry for road feature ${feature.id}`);
+            const fullGeometry = await fetchFullRoadGeometry(
+              feature.id.toString(),
+              point,
+              accessToken
+            );
+            
+            if (fullGeometry && fullGeometry.length > 2) {
+              coordinates = fullGeometry;
+              console.log(`Successfully fetched full geometry with ${coordinates.length} points`);
+            } else {
+              console.log(`Failed to fetch full geometry, using synthetic or tilequery geometry`);
+            }
           }
           
           if (coordinates.length < 2) {

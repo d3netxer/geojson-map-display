@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { ArrowDown, Layers, Maximize2, BarChart3, Info } from 'lucide-react';
@@ -511,12 +512,18 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
   };
   
   // Function to convert road segments to GeoJSON features
+  // Enhanced to ensure roads have proper colors and properties
   const roadSegmentsToGeoJSON = (roads: RoadSegment[]) => {
     return {
       type: 'FeatureCollection',
       features: roads.map(road => {
         // Get color based on congestion level
         const color = getCongestionColor(road.congestionLevel);
+        
+        // Check if coordinates are valid
+        if (!road.coordinates || road.coordinates.length < 2) {
+          console.warn(`Road ${road.id} has invalid coordinates:`, road.coordinates);
+        }
         
         return {
           type: 'Feature',
@@ -527,6 +534,7 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
             speed: road.speed,
             length: road.length,
             color,
+            hexagonId: road.hexagonId,
             roadData: JSON.stringify(road) // Store the full road object for later
           },
           geometry: {
@@ -552,6 +560,8 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
     try {
       const geojson = roadSegmentsToGeoJSON(roads);
       
+      console.log(`Rendering ${roads.length} roads with detailed geometry`);
+      
       if (map.current.getSource('congested-roads')) {
         (map.current.getSource('congested-roads') as mapboxgl.GeoJSONSource).setData(geojson);
       }
@@ -563,6 +573,12 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
       
       // Set the line opacity for roads-highlight to enable hovering
       map.current.setPaintProperty('roads-highlight', 'line-opacity', 0.01);
+      
+      // Add debug information about road geometries
+      const coordinateCounts = roads.map(r => r.coordinates.length);
+      const avgCoords = coordinateCounts.reduce((acc, val) => acc + val, 0) / roads.length;
+      console.log(`Average coordinates per road: ${avgCoords.toFixed(1)}`);
+      console.log(`Road coordinate counts: Min=${Math.min(...coordinateCounts)}, Max=${Math.max(...coordinateCounts)}`);
       
     } catch (error) {
       console.error('Error rendering congested roads:', error);

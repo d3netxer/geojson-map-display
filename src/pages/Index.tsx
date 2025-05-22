@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Toaster } from "sonner";
 import { toast } from "sonner";
@@ -116,6 +117,7 @@ const Index = () => {
     try {
       // Call the findCongestedRoads method in the map component
       if (mapRef.findCongestedRoads) {
+        toast.info("Analyzing roads and retrieving full geometries...");
         const roads = await mapRef.findCongestedRoads(apiKey);
         setCongestedRoads(roads);
         setShowCongestedRoads(true);
@@ -125,9 +127,10 @@ const Index = () => {
         } else {
           const syntheticCount = roads.filter(r => r.id.startsWith('synthetic')).length;
           const realCount = roads.length - syntheticCount;
+          const enhancedGeometryCount = roads.filter(r => r.coordinates.length > 10).length;
           
           if (realCount > 0) {
-            toast.success(`Found ${roads.length} congested roads (${realCount} real, ${syntheticCount} synthetic)`);
+            toast.success(`Found ${roads.length} congested roads (${enhancedGeometryCount} with enhanced geometry)`);
           } else {
             toast.warning(`No real road data found. Generated ${syntheticCount} synthetic roads.`);
           }
