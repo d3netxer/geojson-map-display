@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Toaster } from "sonner";
 import { toast } from "sonner";
@@ -6,7 +5,8 @@ import MapboxMap from '../components/MapboxMap';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Info } from 'lucide-react';
+import { Info, BarChart3 } from 'lucide-react';
+import CongestionRanking from '@/components/CongestionRanking';
 
 // Import the GeoJSON manager
 import activeGeoJSON, { getActiveGeoJSON, geoJSONDatasets } from '../data/geoJSONManager';
@@ -17,6 +17,8 @@ const Index = () => {
   const [mapReady, setMapReady] = useState<boolean>(true);
   const [currentGeoJSON, setCurrentGeoJSON] = useState<any>(activeGeoJSON);
   const [datasetSource, setDatasetSource] = useState<string>(import.meta.env.VITE_GEOJSON_SOURCE || 'default');
+  const [showCongestionRanking, setShowCongestionRanking] = useState<boolean>(false);
+  const [mapRef, setMapRef] = useState<any>(null);
 
   // When component mounts, check which dataset is active
   useEffect(() => {
@@ -48,6 +50,35 @@ const Index = () => {
     }, 100);
   };
 
+  // Focus on a specific feature on the map
+  const handleFocusArea = (feature: any) => {
+    if (!mapRef) return;
+    
+    // Get the first coordinate of the feature to center on
+    let coordinates;
+    
+    if (feature.geometry.type === 'MultiPolygon') {
+      coordinates = feature.geometry.coordinates[0][0][0];
+    } else if (feature.geometry.type === 'Polygon') {
+      coordinates = feature.geometry.coordinates[0][0];
+    }
+    
+    if (coordinates) {
+      mapRef.flyTo({
+        center: coordinates,
+        zoom: 14,
+        pitch: 60,
+        duration: 2000
+      });
+      
+      // Highlight the selected hexagon by setting it as the selected feature
+      mapRef.setSelectedFeature(feature);
+      
+      // Close congestion ranking dialog
+      setShowCongestionRanking(false);
+    }
+  };
+
   return (
     <div className="relative min-h-screen bg-background antialiased">
       <Toaster position="top-right" richColors />
@@ -62,6 +93,17 @@ const Index = () => {
         <Info size={20} />
       </Button>
       
+      {/* Congestion Ranking Button */}
+      <Button 
+        variant="secondary"
+        size="sm"
+        className="absolute top-4 right-20 z-50 bg-white/80 backdrop-blur-sm hover:bg-white/90 flex items-center gap-2"
+        onClick={() => setShowCongestionRanking(true)}
+      >
+        <BarChart3 size={16} />
+        Top Congested Areas
+      </Button>
+      
       {/* Dataset Toggle Button */}
       <Button 
         variant="secondary"
@@ -73,7 +115,13 @@ const Index = () => {
       </Button>
       
       {/* Map Component */}
-      {mapReady && <MapboxMap apiKey={apiKey} geoJSONData={currentGeoJSON} />}
+      {mapReady && (
+        <MapboxMap 
+          apiKey={apiKey} 
+          geoJSONData={currentGeoJSON} 
+          onMapInit={(mapInstance) => setMapRef(mapInstance)} 
+        />
+      )}
       
       {/* API Key Dialog */}
       <Dialog open={showApiKeyModal} onOpenChange={setShowApiKeyModal}>
@@ -121,9 +169,24 @@ const Index = () => {
           </div>
         </DialogContent>
       </Dialog>
+      
+      {/* Congestion Ranking Dialog */}
+      <Dialog open={showCongestionRanking} onOpenChange={setShowCongestionRanking}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Most Congested Areas Analysis</DialogTitle>
+            <DialogDescription>
+              The following areas have the highest congestion levels based on the current dataset.
+            </DialogDescription>
+          </DialogHeader>
+          <CongestionRanking 
+            geoJSONData={currentGeoJSON} 
+            onFocusArea={handleFocusArea} 
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
 
 export default Index;
-

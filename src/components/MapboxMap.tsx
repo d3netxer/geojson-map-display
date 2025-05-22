@@ -11,9 +11,10 @@ import MapLegend from './MapLegend';
 interface MapboxMapProps {
   apiKey?: string;
   geoJSONData: any;
+  onMapInit?: (mapInstance: any) => void;
 }
 
-const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
+const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [loading, setLoading] = useState(true);
@@ -207,7 +208,7 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData }) => {
         map.current.remove();
       }
     };
-  }, [token, mapStyle, geoJSONData, metric]);
+  }, [token, mapStyle, geoJSONData, metric, onMapInit]);
   
   useEffect(() => {
     if (!map.current || !map.current.isStyleLoaded() || !map.current.getLayer('hexagons-fill')) return;
