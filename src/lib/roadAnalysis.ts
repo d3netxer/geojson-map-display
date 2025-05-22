@@ -1,4 +1,3 @@
-
 /**
  * Types for road analysis
  */
@@ -97,6 +96,96 @@ export const testMapboxRoadQuery = async (
 };
 
 /**
+ * Calculates the length of a LineString in meters using the Haversine formula
+ */
+const calculateRoadLength = (coordinates: [number, number][]): number => {
+  if (coordinates.length < 2) return 0;
+  
+  const R = 6371000; // Earth radius in meters
+  let total = 0;
+  
+  for (let i = 1; i < coordinates.length; i++) {
+    const [lon1, lat1] = coordinates[i - 1];
+    const [lon2, lat2] = coordinates[i];
+    
+    // Convert to radians
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const lat1Rad = lat1 * Math.PI / 180;
+    const lat2Rad = lat2 * Math.PI / 180;
+    
+    // Haversine formula
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1Rad) * Math.cos(lat2Rad) * 
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance = R * c; // Distance in meters
+    
+    total += distance;
+  }
+  
+  return total;
+};
+
+/**
+ * Fetches road data for a specific location using Mapbox Tilequery API
+ */
+const fetchRoadsAtLocation = async (
+  center: [number, number],
+  accessToken: string,
+  radius: number = 300,
+  congestionLevel: number,
+  speed?: number
+): Promise<RoadSegment[]> => {
+  try {
+    // Query the Mapbox tilequery API for roads at this location
+    const layers = 'road';
+    const url = `https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/tilequery/${center[0]},${center[1]}.json?radius=${radius}&limit=5&layers=${layers}&dedupe&geometry=linestring&access_token=${accessToken}`;
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      console.error(`Mapbox API error: ${response.status} ${response.statusText}`);
+      return [];
+    }
+    
+    const data = await response.json();
+    const roads: RoadSegment[] = [];
+    
+    if (data.features && data.features.length > 0) {
+      // Process each road feature
+      for (const feature of data.features) {
+        // Skip non-LineString geometries
+        if (feature.geometry.type !== 'LineString') continue;
+        
+        // Get coordinates
+        const coordinates = feature.geometry.coordinates as [number, number][];
+        
+        // Calculate road length
+        const length = calculateRoadLength(coordinates);
+        
+        // Create a road segment
+        const roadSegment: RoadSegment = {
+          id: feature.id || `road-${Math.random().toString(36).substring(2, 10)}`,
+          name: feature.properties.name || 'Unnamed Road',
+          coordinates: coordinates,
+          congestionLevel: congestionLevel,
+          speed: speed,
+          length: length
+        };
+        
+        roads.push(roadSegment);
+      }
+    }
+    
+    return roads;
+  } catch (error) {
+    console.error("Failed to fetch roads at location:", error);
+    return [];
+  }
+};
+
+/**
  * Finds congested roads based on hexagon data
  * This will query the Mapbox API for road data and combine it with congestion data
  */
@@ -106,21 +195,78 @@ export const findCongestedRoads = async (
   accessToken: string,
   limit: number = 10
 ): Promise<RoadSegment[]> => {
-  // This is a placeholder implementation
-  // In a real implementation, we would:
-  // 1. Find hexagons with high congestion
-  // 2. Query the Mapbox API for roads in those areas
-  // 3. Combine the congestion data with the road data
-  // 4. Return the most congested roads
-
-  // For now, we'll just return some synthetic roads for visualization
-  const syntheticRoads: RoadSegment[] = [];
-  
   // Filter hexagons to find the most congested ones
   const congestedHexagons = [...hexagons]
     .filter(hex => hex.properties && hex.properties.mean_conge > 0.5)
     .sort((a, b) => b.properties.mean_conge - a.properties.mean_conge)
     .slice(0, limit);
+  
+  console.log(`Found ${congestedHexagons.length} congested hexagons`);
+  
+  // Collect all roads from congested hexagons
+  const allRoads: RoadSegment[] = [];
+  
+  // Keep track of already processed roads to avoid duplicates
+  const processedRoadIds = new Set<string>();
+  
+  // For each congested hexagon, fetch the roads in its area
+  for (const hex of congestedHexagons) {
+    // Extract the center point of the hexagon
+    let center: [number, number] = [0, 0];
+    
+    if (hex.geometry.type === 'Polygon') {
+      // Calculate center of polygon
+      const coords = hex.geometry.coordinates[0];
+      const sumX = coords.reduce((sum: number, coord: number[]) => sum + coord[0], 0);
+      const sumY = coords.reduce((sum: number, coord: number[]) => sum + coord[1], 0);
+      center = [sumX / coords.length, sumY / coords.length];
+    } else if (hex.geometry.type === 'MultiPolygon') {
+      // Use the first polygon
+      const coords = hex.geometry.coordinates[0][0];
+      const sumX = coords.reduce((sum: number, coord: number[]) => sum + coord[0], 0);
+      const sumY = coords.reduce((sum: number, coord: number[]) => sum + coord[1], 0);
+      center = [sumX / coords.length, sumY / coords.length];
+    }
+    
+    console.log(`Fetching roads for hexagon at [${center[0].toFixed(5)}, ${center[1].toFixed(5)}] with congestion level ${hex.properties.mean_conge.toFixed(2)}`);
+    
+    // Fetch roads at this location
+    const roads = await fetchRoadsAtLocation(
+      center, 
+      accessToken, 
+      300, // 300m radius
+      hex.properties.mean_conge || 0.7, 
+      hex.properties.mean_speed
+    );
+    
+    console.log(`Found ${roads.length} roads at hexagon location`);
+    
+    // Add non-duplicate roads to the result
+    for (const road of roads) {
+      if (!processedRoadIds.has(road.id)) {
+        processedRoadIds.add(road.id);
+        allRoads.push(road);
+      }
+    }
+  }
+  
+  // If no real roads were found, fall back to synthetic roads as a backup
+  if (allRoads.length === 0) {
+    console.warn("No real road data found, generating synthetic roads as fallback");
+    return generateSyntheticRoads(congestedHexagons);
+  }
+  
+  console.log(`Returning ${allRoads.length} unique roads`);
+  
+  // Return all found roads
+  return allRoads;
+};
+
+/**
+ * Generate synthetic roads as a fallback when real data isn't available
+ */
+const generateSyntheticRoads = (congestedHexagons: any[]): RoadSegment[] => {
+  const syntheticRoads: RoadSegment[] = [];
   
   // Create a synthetic road for each congested hexagon
   for (let i = 0; i < congestedHexagons.length; i++) {
