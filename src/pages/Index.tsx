@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Toaster } from "sonner";
 import { toast } from "sonner";
@@ -23,6 +24,8 @@ const Index = () => {
   const [congestedRoads, setCongestedRoads] = useState<RoadSegment[]>([]);
   const [isAnalyzingRoads, setIsAnalyzingRoads] = useState<boolean>(false);
   const [currentMapCenter, setCurrentMapCenter] = useState<[number, number]>([46.67, 24.71]);
+  // New state to track if roads have been analyzed already
+  const [roadsAnalyzed, setRoadsAnalyzed] = useState<boolean>(false);
 
   // When component mounts, check which dataset is active
   useEffect(() => {
@@ -81,6 +84,10 @@ const Index = () => {
         toast.success(`Switched to ${newDataset} dataset (${geoJSONDatasets[newDataset as keyof typeof geoJSONDatasets].features.length} features)`);
       }, 100);
     }
+    
+    // Reset roads analysis state when switching datasets
+    setRoadsAnalyzed(false);
+    setCongestedRoads([]);
   };
 
   // Focus on a specific road on the map
@@ -108,6 +115,12 @@ const Index = () => {
 
   // Analyze roads in the current map view
   const handleAnalyzeRoads = async () => {
+    // If roads have already been analyzed, just show the dialog
+    if (roadsAnalyzed) {
+      setShowCongestedRoads(true);
+      return;
+    }
+    
     if (!mapRef || isAnalyzingRoads) return;
     
     setIsAnalyzingRoads(true);
@@ -119,6 +132,8 @@ const Index = () => {
         const roads = await mapRef.findCongestedRoads(apiKey);
         setCongestedRoads(roads);
         setShowCongestedRoads(true);
+        // Mark roads as analyzed
+        setRoadsAnalyzed(true);
         
         if (roads.length === 0) {
           toast.warning("No road data found in the current view");
@@ -159,7 +174,7 @@ const Index = () => {
         <Info size={20} />
       </Button>
       
-      {/* Road Analysis Button */}
+      {/* Road Analysis Button - Show different text based on whether analysis has been run */}
       <Button 
         variant="secondary"
         size="sm"
@@ -168,7 +183,7 @@ const Index = () => {
         disabled={isAnalyzingRoads}
       >
         <RadarIcon size={16} />
-        {isAnalyzingRoads ? 'Analyzing...' : 'Find & Map Roads'}
+        {isAnalyzingRoads ? 'Analyzing...' : roadsAnalyzed ? 'Show Road Analysis' : 'Find & Map Roads'}
       </Button>
       
       {/* Dataset Toggle Button */}
