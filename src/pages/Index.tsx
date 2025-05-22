@@ -6,7 +6,7 @@ import MapboxMap from '../components/MapboxMap';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Info, BarChart3, RoadIcon } from 'lucide-react';
+import { Info, BarChart3, RadarIcon } from 'lucide-react';
 import CongestionRanking from '@/components/CongestionRanking';
 import CongestedRoads from '@/components/CongestedRoads';
 import { RoadSegment } from '@/lib/roadAnalysis';
@@ -169,7 +169,7 @@ const Index = () => {
         onClick={handleAnalyzeRoads}
         disabled={isAnalyzingRoads}
       >
-        <RoadIcon size={16} />
+        <RadarIcon size={16} />
         {isAnalyzingRoads ? 'Analyzing...' : 'Analyze Roads'}
       </Button>
       
