@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { ArrowDown, Layers, Maximize2, BarChart3, Info } from 'lucide-react';
@@ -6,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
 import { processGeoJSON, getColorScale, formatValue, getHeightMultiplier } from '@/lib/mapUtils';
+import { findCongestedRoads, RoadSegment } from '@/lib/roadAnalysis';
 import MapLegend from './MapLegend';
 
 interface MapboxMapProps {
@@ -20,10 +22,12 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
   const [loading, setLoading] = useState(true);
   const [metric, setMetric] = useState<string>('mean_conge');
   const [selectedFeature, setSelectedFeature] = useState<any>(null);
+  const [selectedRoad, setSelectedRoad] = useState<RoadSegment | null>(null);
   const [mapStyle, setMapStyle] = useState<string>('mapbox://styles/mapbox/streets-v12');
   const [fullscreen, setFullscreen] = useState<boolean>(false);
   const [metricStats, setMetricStats] = useState<any>(null);
   const [colorScale, setColorScale] = useState<string[]>([]);
+  const [roadLayers, setRoadLayers] = useState<string[]>([]);
   
   const validateMapboxToken = (token: string) => {
     const tokenParts = token.split('.');
@@ -88,6 +92,15 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
         mapInstance.addSource('riyadh-hexagons', {
           type: 'geojson',
           data: processedGeoJSON,
+        });
+        
+        // Add a source for roads that will be populated later
+        mapInstance.addSource('congested-roads', {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features: []
+          }
         });
         
         console.log('Adding hexagon layers with features count:', processedGeoJSON.features.length);
@@ -168,17 +181,87 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
           }
         });
         
+        // Add road layers (initially empty)
+        mapInstance.addLayer({
+          id: 'roads-line',
+          type: 'line',
+          source: 'congested-roads',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          paint: {
+            'line-width': 6,
+            'line-color': ['get', 'color'],
+            'line-opacity': 0.8
+          }
+        });
+        
+        mapInstance.addLayer({
+          id: 'roads-outline',
+          type: 'line',
+          source: 'congested-roads',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          paint: {
+            'line-width': 8,
+            'line-color': '#000',
+            'line-opacity': 0.3
+          }
+        });
+        
+        // Add an interaction layer
+        mapInstance.addLayer({
+          id: 'roads-highlight',
+          type: 'line',
+          source: 'congested-roads',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          paint: {
+            'line-width': 10,
+            'line-color': '#ffffff',
+            'line-opacity': 0
+          }
+        });
+        
+        // Track the road layers
+        setRoadLayers(['roads-line', 'roads-outline', 'roads-highlight']);
+        
         mapInstance.on('click', 'hexagons-fill', (e) => {
           if (!e.features || e.features.length === 0) return;
           
           const feature = e.features[0];
           setSelectedFeature(feature);
+          setSelectedRoad(null);
           
           const coordinates = e.lngLat;
           
           mapInstance.flyTo({
             center: coordinates,
             zoom: Math.max(mapInstance.getZoom(), 13.5),
+            duration: 1000,
+            essential: true
+          });
+        });
+        
+        mapInstance.on('click', 'roads-highlight', (e) => {
+          if (!e.features || e.features.length === 0) return;
+          
+          const roadId = e.features[0].properties.id;
+          const roadData = JSON.parse(e.features[0].properties.roadData);
+          setSelectedRoad(roadData);
+          setSelectedFeature(null);
+          
+          // Fly to the road
+          const coordinates = roadData.coordinates[Math.floor(roadData.coordinates.length / 2)];
+          
+          mapInstance.flyTo({
+            center: coordinates,
+            zoom: Math.max(mapInstance.getZoom(), 14),
             duration: 1000,
             essential: true
           });
@@ -192,7 +275,38 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
           mapInstance.getCanvas().style.cursor = '';
         });
         
+        mapInstance.on('mouseenter', 'roads-highlight', () => {
+          mapInstance.getCanvas().style.cursor = 'pointer';
+        });
+        
+        mapInstance.on('mouseleave', 'roads-highlight', () => {
+          mapInstance.getCanvas().style.cursor = '';
+        });
+        
         setLoading(false);
+        
+        // Make map methods available to parent component
+        if (onMapInit) {
+          // Create an enhanced map instance with additional methods
+          const enhancedMapInstance = {
+            ...mapInstance,
+            setSelectedFeature: (feature: any) => {
+              setSelectedFeature(feature);
+              setSelectedRoad(null);
+            },
+            setSelectedRoad: (road: RoadSegment) => {
+              setSelectedRoad(road);
+              setSelectedFeature(null);
+              renderSelectedRoad(road);
+            },
+            findCongestedRoads: async (mapboxToken: string) => {
+              return await findAndRenderCongestedRoads(mapboxToken);
+            },
+            flyTo: mapInstance.flyTo.bind(mapInstance)
+          };
+          
+          onMapInit(enhancedMapInstance);
+        }
         
         toast.success(`Map data loaded successfully with ${processedGeoJSON.features.length} hexagons!`);
       });
@@ -208,7 +322,7 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
         map.current.remove();
       }
     };
-  }, [token, mapStyle, geoJSONData, metric, onMapInit]);
+  }, [token, mapStyle, geoJSONData, onMapInit]);
   
   useEffect(() => {
     if (!map.current || !map.current.isStyleLoaded() || !map.current.getLayer('hexagons-fill')) return;
@@ -321,6 +435,117 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
     
     const styleNames = ['Standard', 'Light', 'Dark', 'Satellite'];
     toast.success(`Map style changed to ${styleNames[nextIndex]}`);
+  };
+  
+  // Function to convert road segments to GeoJSON features
+  const roadSegmentsToGeoJSON = (roads: RoadSegment[]) => {
+    return {
+      type: 'FeatureCollection',
+      features: roads.map(road => {
+        // Get color based on congestion level
+        const color = getCongestionColor(road.congestionLevel);
+        
+        return {
+          type: 'Feature',
+          properties: {
+            id: road.id,
+            name: road.name,
+            congestionLevel: road.congestionLevel,
+            speed: road.speed,
+            length: road.length,
+            color,
+            roadData: JSON.stringify(road) // Store the full road object for later
+          },
+          geometry: {
+            type: 'LineString',
+            coordinates: road.coordinates
+          }
+        };
+      })
+    };
+  };
+  
+  // Function to get color based on congestion level
+  const getCongestionColor = (level: number): string => {
+    if (level < 0.3) return '#22c55e'; // Green
+    if (level < 0.6) return '#f59e0b'; // Yellow/Amber
+    return '#ef4444'; // Red
+  };
+  
+  // Function to render congested roads on the map
+  const renderCongestedRoads = (roads: RoadSegment[]) => {
+    if (!map.current || !map.current.isStyleLoaded()) return;
+    
+    try {
+      const geojson = roadSegmentsToGeoJSON(roads);
+      
+      if (map.current.getSource('congested-roads')) {
+        (map.current.getSource('congested-roads') as mapboxgl.GeoJSONSource).setData(geojson);
+      }
+      
+      // Make road layers visible
+      roadLayers.forEach(layerId => {
+        map.current!.setLayoutProperty(layerId, 'visibility', 'visible');
+      });
+      
+      // Set the line opacity for roads-highlight to enable hovering
+      map.current.setPaintProperty('roads-highlight', 'line-opacity', 0.01);
+      
+    } catch (error) {
+      console.error('Error rendering congested roads:', error);
+    }
+  };
+  
+  // Function to render a single selected road
+  const renderSelectedRoad = (road: RoadSegment) => {
+    if (!map.current || !map.current.isStyleLoaded()) return;
+    
+    try {
+      // Convert to GeoJSON and render just this road
+      const geojson = roadSegmentsToGeoJSON([road]);
+      
+      if (map.current.getSource('congested-roads')) {
+        (map.current.getSource('congested-roads') as mapboxgl.GeoJSONSource).setData(geojson);
+      }
+      
+      // Make road layers visible
+      roadLayers.forEach(layerId => {
+        map.current!.setLayoutProperty(layerId, 'visibility', 'visible');
+      });
+      
+      // Highlight this road
+      map.current.setPaintProperty('roads-line', 'line-width', 8);
+      map.current.setPaintProperty('roads-outline', 'line-width', 12);
+      
+    } catch (error) {
+      console.error('Error rendering selected road:', error);
+    }
+  };
+  
+  // Function to find and render congested roads
+  const findAndRenderCongestedRoads = async (mapboxToken: string) => {
+    if (!map.current || !geoJSONData.features) {
+      return [];
+    }
+    
+    try {
+      // Find congested roads based on hexagon data
+      const roads = await findCongestedRoads(
+        map.current,
+        geoJSONData.features,
+        mapboxToken,
+        10 // Limit to top 10 roads
+      );
+      
+      // Render the roads on the map
+      renderCongestedRoads(roads);
+      
+      return roads;
+    } catch (error) {
+      console.error('Failed to find congested roads:', error);
+      toast.error('Failed to analyze road network');
+      return [];
+    }
   };
 
   return (
@@ -465,6 +690,45 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
                   
                   <div className="font-medium">Urban Road Length:</div>
                   <div className="text-right">{selectedFeature.properties.sum_urban_.toFixed(0)} m</div>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
+        
+        {selectedRoad && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                className="flex items-center justify-between gap-2 w-full"
+              >
+                <Info size={16} />
+                <span>{selectedRoad.name}</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72" align="end">
+              <div className="space-y-2">
+                <h3 className="font-semibold">{selectedRoad.name}</h3>
+                <Separator />
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="font-medium">Congestion Level:</div>
+                  <div className="text-right">{Math.round(selectedRoad.congestionLevel * 100)}%</div>
+                  
+                  {selectedRoad.speed && (
+                    <>
+                      <div className="font-medium">Estimated Speed:</div>
+                      <div className="text-right">{Math.round(selectedRoad.speed)} km/h</div>
+                    </>
+                  )}
+                  
+                  <div className="font-medium">Length:</div>
+                  <div className="text-right">
+                    {selectedRoad.length < 1000
+                      ? `${Math.round(selectedRoad.length)} m`
+                      : `${(selectedRoad.length / 1000).toFixed(1)} km`}
+                  </div>
                 </div>
               </div>
             </PopoverContent>

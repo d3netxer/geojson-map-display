@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Toaster } from "sonner";
 import { toast } from "sonner";
@@ -5,8 +6,10 @@ import MapboxMap from '../components/MapboxMap';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Info, BarChart3 } from 'lucide-react';
+import { Info, BarChart3, RoadIcon } from 'lucide-react';
 import CongestionRanking from '@/components/CongestionRanking';
+import CongestedRoads from '@/components/CongestedRoads';
+import { RoadSegment } from '@/lib/roadAnalysis';
 
 // Import the GeoJSON manager
 import activeGeoJSON, { getActiveGeoJSON, geoJSONDatasets } from '../data/geoJSONManager';
@@ -18,14 +21,15 @@ const Index = () => {
   const [currentGeoJSON, setCurrentGeoJSON] = useState<any>(activeGeoJSON);
   const [datasetSource, setDatasetSource] = useState<string>(import.meta.env.VITE_GEOJSON_SOURCE || 'default');
   const [showCongestionRanking, setShowCongestionRanking] = useState<boolean>(false);
+  const [showCongestedRoads, setShowCongestedRoads] = useState<boolean>(false);
   const [mapRef, setMapRef] = useState<any>(null);
+  const [congestedRoads, setCongestedRoads] = useState<RoadSegment[]>([]);
+  const [isAnalyzingRoads, setIsAnalyzingRoads] = useState<boolean>(false);
 
   // When component mounts, check which dataset is active
   useEffect(() => {
     const currentDataset = import.meta.env.VITE_GEOJSON_SOURCE || 'default';
     setDatasetSource(currentDataset);
-    
-    // Removed the toast.info notification about dataset format
   }, []);
 
   const handleApiKeySubmit = () => {
@@ -79,6 +83,59 @@ const Index = () => {
     }
   };
 
+  // Focus on a specific road on the map
+  const handleFocusRoad = (road: RoadSegment) => {
+    if (!mapRef) return;
+    
+    // Get the midpoint of the road to center on
+    const midIndex = Math.floor(road.coordinates.length / 2);
+    const coordinates = road.coordinates[midIndex];
+    
+    mapRef.flyTo({
+      center: coordinates,
+      zoom: 15,
+      pitch: 60,
+      duration: 2000
+    });
+    
+    // Highlight the road (if the map component has a setSelectedRoad method)
+    if (mapRef.setSelectedRoad) {
+      mapRef.setSelectedRoad(road);
+    }
+    
+    // Close congested roads dialog
+    setShowCongestedRoads(false);
+  };
+
+  // Analyze roads in the current map view
+  const handleAnalyzeRoads = async () => {
+    if (!mapRef || isAnalyzingRoads) return;
+    
+    setIsAnalyzingRoads(true);
+    
+    try {
+      // Call the findCongestedRoads method in the map component
+      if (mapRef.findCongestedRoads) {
+        const roads = await mapRef.findCongestedRoads(apiKey);
+        setCongestedRoads(roads);
+        setShowCongestedRoads(true);
+        
+        if (roads.length === 0) {
+          toast.warning("No road data found in the current view");
+        } else {
+          toast.success(`Found ${roads.length} congested roads`);
+        }
+      } else {
+        toast.error("Road analysis feature not available");
+      }
+    } catch (error) {
+      console.error("Failed to analyze roads:", error);
+      toast.error("Failed to analyze roads");
+    } finally {
+      setIsAnalyzingRoads(false);
+    }
+  };
+
   return (
     <div className="relative min-h-screen bg-background antialiased">
       <Toaster position="top-right" richColors />
@@ -102,6 +159,18 @@ const Index = () => {
       >
         <BarChart3 size={16} />
         Top Congested Areas
+      </Button>
+      
+      {/* Road Analysis Button */}
+      <Button 
+        variant="secondary"
+        size="sm"
+        className="absolute top-4 right-[210px] z-50 bg-white/80 backdrop-blur-sm hover:bg-white/90 flex items-center gap-2"
+        onClick={handleAnalyzeRoads}
+        disabled={isAnalyzingRoads}
+      >
+        <RoadIcon size={16} />
+        {isAnalyzingRoads ? 'Analyzing...' : 'Analyze Roads'}
       </Button>
       
       {/* Dataset Toggle Button */}
@@ -182,6 +251,22 @@ const Index = () => {
           <CongestionRanking 
             geoJSONData={currentGeoJSON} 
             onFocusArea={handleFocusArea} 
+          />
+        </DialogContent>
+      </Dialog>
+      
+      {/* Congested Roads Dialog */}
+      <Dialog open={showCongestedRoads} onOpenChange={setShowCongestedRoads}>
+        <DialogContent className="sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Most Congested Roads Analysis</DialogTitle>
+            <DialogDescription>
+              Based on the hexagon congestion data, these roads are estimated to have the highest congestion levels.
+            </DialogDescription>
+          </DialogHeader>
+          <CongestedRoads 
+            roads={congestedRoads} 
+            onFocusRoad={handleFocusRoad} 
           />
         </DialogContent>
       </Dialog>
