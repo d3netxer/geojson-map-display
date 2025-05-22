@@ -6,8 +6,7 @@ import MapboxMap from '../components/MapboxMap';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Info, BarChart3, RadarIcon } from 'lucide-react';
-import CongestionRanking from '@/components/CongestionRanking';
+import { Info, RadarIcon } from 'lucide-react';
 import CongestedRoads from '@/components/CongestedRoads';
 import { RoadSegment } from '@/lib/roadAnalysis';
 
@@ -20,7 +19,6 @@ const Index = () => {
   const [mapReady, setMapReady] = useState<boolean>(true);
   const [currentGeoJSON, setCurrentGeoJSON] = useState<any>(activeGeoJSON);
   const [datasetSource, setDatasetSource] = useState<string>(import.meta.env.VITE_GEOJSON_SOURCE || 'default');
-  const [showCongestionRanking, setShowCongestionRanking] = useState<boolean>(false);
   const [showCongestedRoads, setShowCongestedRoads] = useState<boolean>(false);
   const [mapRef, setMapRef] = useState<any>(null);
   const [congestedRoads, setCongestedRoads] = useState<RoadSegment[]>([]);
@@ -70,35 +68,6 @@ const Index = () => {
         setMapReady(true);
         toast.success(`Switched to ${newDataset} dataset (${geoJSONDatasets[newDataset as keyof typeof geoJSONDatasets].features.length} features)`);
       }, 100);
-    }
-  };
-
-  // Focus on a specific feature on the map
-  const handleFocusArea = (feature: any) => {
-    if (!mapRef) return;
-    
-    // Get the first coordinate of the feature to center on
-    let coordinates;
-    
-    if (feature.geometry.type === 'MultiPolygon') {
-      coordinates = feature.geometry.coordinates[0][0][0];
-    } else if (feature.geometry.type === 'Polygon') {
-      coordinates = feature.geometry.coordinates[0][0];
-    }
-    
-    if (coordinates) {
-      mapRef.flyTo({
-        center: coordinates,
-        zoom: 14,
-        pitch: 60,
-        duration: 2000
-      });
-      
-      // Highlight the selected hexagon by setting it as the selected feature
-      mapRef.setSelectedFeature(feature);
-      
-      // Close congestion ranking dialog
-      setShowCongestionRanking(false);
     }
   };
 
@@ -169,22 +138,11 @@ const Index = () => {
         <Info size={20} />
       </Button>
       
-      {/* Congestion Ranking Button */}
-      <Button 
-        variant="secondary"
-        size="sm"
-        className="absolute top-4 right-20 z-50 bg-white/80 backdrop-blur-sm hover:bg-white/90 flex items-center gap-2"
-        onClick={() => setShowCongestionRanking(true)}
-      >
-        <BarChart3 size={16} />
-        Top Congested Areas
-      </Button>
-      
       {/* Road Analysis Button */}
       <Button 
         variant="secondary"
         size="sm"
-        className="absolute top-4 right-[210px] z-50 bg-white/80 backdrop-blur-sm hover:bg-white/90 flex items-center gap-2"
+        className="absolute top-4 right-20 z-50 bg-white/80 backdrop-blur-sm hover:bg-white/90 flex items-center gap-2"
         onClick={handleAnalyzeRoads}
         disabled={isAnalyzingRoads}
       >
@@ -255,22 +213,6 @@ const Index = () => {
               </Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
-      
-      {/* Congestion Ranking Dialog */}
-      <Dialog open={showCongestionRanking} onOpenChange={setShowCongestionRanking}>
-        <DialogContent className="sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Most Congested Areas Analysis</DialogTitle>
-            <DialogDescription>
-              The following areas have the highest congestion levels based on the current dataset.
-            </DialogDescription>
-          </DialogHeader>
-          <CongestionRanking 
-            geoJSONData={currentGeoJSON} 
-            onFocusArea={handleFocusArea} 
-          />
         </DialogContent>
       </Dialog>
       
