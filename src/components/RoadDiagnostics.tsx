@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Separator } from '@/components/ui/separator';
 import { Loader2, CheckCircle, XCircle, MapPin } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface RoadDiagnosticsProps {
   apiKey: string;
@@ -16,14 +17,15 @@ interface RoadDiagnosticsProps {
 
 const RoadDiagnostics: React.FC<RoadDiagnosticsProps> = ({ apiKey, initialCoordinates, onDiagnosticsComplete }) => {
   const [longitude, setLongitude] = useState<string>(
-    initialCoordinates ? initialCoordinates[0].toString() : '46.67'
+    initialCoordinates ? initialCoordinates[0].toString() : '46.6908'
   );
   const [latitude, setLatitude] = useState<string>(
-    initialCoordinates ? initialCoordinates[1].toString() : '24.71'
+    initialCoordinates ? initialCoordinates[1].toString() : '24.7204'
   );
   const [radius, setRadius] = useState<string>('500');
   const [loading, setLoading] = useState<boolean>(false);
   const [diagnostics, setDiagnostics] = useState<RoadApiDiagnostics | null>(null);
+  const [layer, setLayer] = useState<string>('road');
 
   const handleTest = async () => {
     setLoading(true);
@@ -49,6 +51,19 @@ const RoadDiagnostics: React.FC<RoadDiagnosticsProps> = ({ apiKey, initialCoordi
     }
   };
 
+  // Known good coordinates for testing
+  const presetLocations = [
+    { name: "Riyadh Downtown", coords: [46.6908, 24.7204] },
+    { name: "New York City", coords: [-73.9857, 40.7484] },
+    { name: "London", coords: [-0.1276, 51.5074] }
+  ];
+
+  const handleSelectPreset = (index: number) => {
+    const location = presetLocations[index];
+    setLongitude(location.coords[0].toString());
+    setLatitude(location.coords[1].toString());
+  };
+
   return (
     <Card className="w-full">
       <CardHeader>
@@ -57,6 +72,38 @@ const RoadDiagnostics: React.FC<RoadDiagnosticsProps> = ({ apiKey, initialCoordi
       </CardHeader>
       
       <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <label htmlFor="preset-locations" className="text-sm font-medium block mb-2">
+              Preset Locations
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {presetLocations.map((location, index) => (
+                <Button 
+                  key={index} 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => handleSelectPreset(index)}
+                >
+                  {location.name}
+                </Button>
+              ))}
+            </div>
+          </div>
+          
+          <div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="w-full mt-6"
+              onClick={handleUseCurrentMapCenter}
+            >
+              <MapPin className="h-4 w-4 mr-2" />
+              Use Current Map Center
+            </Button>
+          </div>
+        </div>
+        
         <div className="flex items-center gap-2">
           <div className="grid grid-cols-2 gap-2 flex-1">
             <div>
@@ -82,33 +129,42 @@ const RoadDiagnostics: React.FC<RoadDiagnosticsProps> = ({ apiKey, initialCoordi
               />
             </div>
           </div>
-          <div className="flex flex-col justify-end">
-            <Button 
-              variant="outline" 
-              size="sm"
-              className="whitespace-nowrap mt-6"
-              onClick={handleUseCurrentMapCenter}
-            >
-              <MapPin className="h-4 w-4 mr-2" />
-              Use Map Center
-            </Button>
-          </div>
         </div>
         
-        <div>
-          <label htmlFor="radius" className="text-sm font-medium">
-            Search Radius (meters)
-          </label>
-          <Input 
-            id="radius"
-            value={radius} 
-            onChange={(e) => setRadius(e.target.value)}
-            placeholder="Radius in meters" 
-            type="number"
-            min="100"
-            max="1000"
-            step="100"
-          />
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label htmlFor="radius" className="text-sm font-medium">
+              Search Radius (meters)
+            </label>
+            <Input 
+              id="radius"
+              value={radius} 
+              onChange={(e) => setRadius(e.target.value)}
+              placeholder="Radius in meters" 
+              type="number"
+              min="100"
+              max="1000"
+              step="100"
+            />
+          </div>
+          
+          <div>
+            <label htmlFor="layer" className="text-sm font-medium">
+              Mapbox Layer
+            </label>
+            <Select 
+              value={layer} 
+              onValueChange={setLayer}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a layer" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="road">road</SelectItem>
+                <SelectItem value="transportation">transportation</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         
         <Button 
@@ -186,6 +242,10 @@ const RoadDiagnostics: React.FC<RoadDiagnosticsProps> = ({ apiKey, initialCoordi
         <p>
           This tool tests the Mapbox Tilequery API to check if road data is available at the specified location.
           If no roads are found, the application will generate synthetic roads for visualization purposes.
+        </p>
+        <p className="mt-1">
+          Tip: Use the "road" layer with a larger radius for better results. The "dedupe" and "geometry=linestring" 
+          parameters are automatically added to the API request.
         </p>
       </CardFooter>
     </Card>
