@@ -1,14 +1,15 @@
+
 /**
  * Types for road analysis
  */
 export interface RoadSegment {
   id: string;
   name: string;
-  coordinates: [number, number][];
+  coordinates: [number, number][]; // Array of [longitude, latitude] pairs
   congestionLevel: number;
   speed?: number;
   length: number;
-  // New property to track which hexagon this road belongs to
+  // Property to track which hexagon this road belongs to
   hexagonId?: string;
 }
 
@@ -122,6 +123,7 @@ const calculateRoadLength = (coordinates: [number, number][]): number => {
 /**
  * Creates a path from a road point and bearing data
  * Used when the API returns points instead of linestrings
+ * Enhanced to create more points for smoother lines
  */
 const createPathFromPoint = (point: [number, number], bearing: number | undefined, length: number = 100): [number, number][] => {
   if (!bearing) {
@@ -154,41 +156,55 @@ const createPathFromPoint = (point: [number, number], bearing: number | undefine
   const oppositeBearing = (bearing + 180) % 360;
   const oppositeBearingRad = (oppositeBearing * Math.PI) / 180;
   
-  // Calculate backward point
-  const lat2Back = Math.asin(
-    Math.sin(lat1) * Math.cos(pathLength/R) +
-    Math.cos(lat1) * Math.sin(pathLength/R) * Math.cos(oppositeBearingRad)
-  );
+  // Create multiple points along the path for a smoother curve (5 points total)
+  const points: [number, number][] = [];
   
-  const lon2Back = lon1 + Math.atan2(
-    Math.sin(oppositeBearingRad) * Math.sin(pathLength/R) * Math.cos(lat1),
-    Math.cos(pathLength/R) - Math.sin(lat1) * Math.sin(lat2Back)
-  );
+  // Add backward points (2 points)
+  for (let i = 2; i > 0; i--) {
+    const fraction = i / 2;
+    const pathFraction = pathLength * fraction;
+    
+    const lat2Back = Math.asin(
+      Math.sin(lat1) * Math.cos(pathFraction/R) +
+      Math.cos(lat1) * Math.sin(pathFraction/R) * Math.cos(oppositeBearingRad)
+    );
+    
+    const lon2Back = lon1 + Math.atan2(
+      Math.sin(oppositeBearingRad) * Math.sin(pathFraction/R) * Math.cos(lat1),
+      Math.cos(pathFraction/R) - Math.sin(lat1) * Math.sin(lat2Back)
+    );
+    
+    points.push([
+      (lon2Back * 180 / Math.PI), 
+      (lat2Back * 180 / Math.PI)
+    ]);
+  }
   
-  // Calculate forward point
-  const lat2Forward = Math.asin(
-    Math.sin(lat1) * Math.cos(pathLength/R) +
-    Math.cos(lat1) * Math.sin(pathLength/R) * Math.cos(bearingRad)
-  );
+  // Add the center point
+  points.push(point);
   
-  const lon2Forward = lon1 + Math.atan2(
-    Math.sin(bearingRad) * Math.sin(pathLength/R) * Math.cos(lat1),
-    Math.cos(pathLength/R) - Math.sin(lat1) * Math.sin(lat2Forward)
-  );
+  // Add forward points (2 points)
+  for (let i = 1; i <= 2; i++) {
+    const fraction = i / 2;
+    const pathFraction = pathLength * fraction;
+    
+    const lat2Forward = Math.asin(
+      Math.sin(lat1) * Math.cos(pathFraction/R) +
+      Math.cos(lat1) * Math.sin(pathFraction/R) * Math.cos(bearingRad)
+    );
+    
+    const lon2Forward = lon1 + Math.atan2(
+      Math.sin(bearingRad) * Math.sin(pathFraction/R) * Math.cos(lat1),
+      Math.cos(pathFraction/R) - Math.sin(lat1) * Math.sin(lat2Forward)
+    );
+    
+    points.push([
+      (lon2Forward * 180 / Math.PI),
+      (lat2Forward * 180 / Math.PI)
+    ]);
+  }
   
-  // Convert back to degrees
-  const backPoint: [number, number] = [
-    (lon2Back * 180 / Math.PI), 
-    (lat2Back * 180 / Math.PI)
-  ];
-  
-  const forwardPoint: [number, number] = [
-    (lon2Forward * 180 / Math.PI),
-    (lat2Forward * 180 / Math.PI)
-  ];
-  
-  // Return array with 3 points: backward, original, forward
-  return [backPoint, point, forwardPoint];
+  return points;
 };
 
 /**
@@ -201,13 +217,13 @@ const fetchRoadsAtLocation = async (
   radius: number = 500,
   congestionLevel: number,
   speed?: number,
-  hexagonId?: string // Add hexagonId parameter to track source hexagon
+  hexagonId?: string
 ): Promise<RoadSegment[]> => {
   try {
     // Query the Mapbox tilequery API for roads at this location
+    // Increase the limit to get more roads and increase the chance of finding actual LineStrings
     const layers = 'road';
-    // Note: We've removed the 'geometry=linestring' filter to get ALL types of road geometries
-    const url = `https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/tilequery/${center[0]},${center[1]}.json?radius=${radius}&limit=10&layers=${layers}&dedupe&access_token=${accessToken}`;
+    const url = `https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/tilequery/${center[0]},${center[1]}.json?radius=${radius}&limit=25&layers=${layers}&dedupe&access_token=${accessToken}`;
     
     const response = await fetch(url);
     
@@ -243,8 +259,8 @@ const fetchRoadsAtLocation = async (
             const point: [number, number] = [feature.geometry.coordinates[0], feature.geometry.coordinates[1]];
             const bearing = feature.properties.bearing;
             
-            // Create a path from the point, either based on bearing or just a small line segment
-            coordinates = createPathFromPoint(point, bearing, 100);
+            // Create a path from the point with more points for smoother lines
+            coordinates = createPathFromPoint(point, bearing, 150);
             console.log(`Created synthetic path from point with ${coordinates.length} coordinates`);
           } else {
             // Skip other geometry types
@@ -279,7 +295,7 @@ const fetchRoadsAtLocation = async (
             congestionLevel: congestionLevel,
             speed: speed,
             length: length,
-            hexagonId: hexagonId // Add the hexagon ID to track its source
+            hexagonId: hexagonId
           };
           
           roads.push(roadSegment);
@@ -302,8 +318,7 @@ const fetchRoadsAtLocation = async (
 
 /**
  * Finds congested roads based on hexagon data
- * This will query the Mapbox API for road data and combine it with congestion data
- * Modified to return the longest road from each of the top congested hexagons
+ * Returns the longest road from each of the top congested hexagons
  */
 export const findCongestedRoads = async (
   map: any,
@@ -390,6 +405,7 @@ export const findCongestedRoads = async (
 
 /**
  * Generate a synthetic road for a single hexagon
+ * Enhanced to create more natural-looking road geometries
  */
 const generateSyntheticRoadForHexagon = (hex: any, hexagonId: string): RoadSegment => {
   // Extract the center point of the hexagon
@@ -409,7 +425,7 @@ const generateSyntheticRoadForHexagon = (hex: any, hexagonId: string): RoadSegme
     center = [sumX / coords.length, sumY / coords.length];
   }
   
-  // Create a synthetic road
+  // Create a synthetic road with more points for a more natural appearance
   const roadLength = Math.random() * 1000 + 500; // 500-1500 meters
   const angle = Math.random() * Math.PI * 2; // Random angle in radians
   
@@ -425,16 +441,26 @@ const generateSyntheticRoadForHexagon = (hex: any, hexagonId: string): RoadSegme
   ];
   
   // Create additional points along the road for a more realistic appearance
-  const numPoints = Math.floor(roadLength / 100) + 2; // One point per 100m
+  // Increase number of points for smoother curves
+  const numPoints = Math.max(Math.floor(roadLength / 75) + 2, 8); // At least 8 points for smoothness
   const coordinates: [number, number][] = [];
   
   for (let j = 0; j < numPoints; j++) {
     const fraction = j / (numPoints - 1);
-    // Add slight randomness to make it look more natural
-    const jitter = (Math.random() - 0.5) * 0.0001;
+    
+    // Add slight curvature by using sine wave offset
+    const curveFactor = Math.sin(fraction * Math.PI) * 0.0002;
+    const perpX = Math.sin(angle) * curveFactor;
+    const perpY = -Math.cos(angle) * curveFactor;
+    
+    // Add some random variation to each point for natural appearance
+    const jitter = (Math.random() - 0.5) * 0.00015;
+    const jitterX = Math.sin(angle + Math.PI/2) * jitter;
+    const jitterY = Math.cos(angle + Math.PI/2) * jitter;
+    
     coordinates.push([
-      start[0] + (end[0] - start[0]) * fraction + jitter,
-      start[1] + (end[1] - start[1]) * fraction + jitter
+      start[0] + (end[0] - start[0]) * fraction + perpX + jitterX,
+      start[1] + (end[1] - start[1]) * fraction + perpY + jitterY
     ]);
   }
   
