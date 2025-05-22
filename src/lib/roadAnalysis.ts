@@ -28,11 +28,12 @@ export interface RoadApiDiagnostics {
 export const testMapboxRoadQuery = async (
   center: [number, number],
   accessToken: string,
-  radius: number = 500
+  radius: number = 25,
+  limit: number = 10,
+  layerType: string = 'road'
 ): Promise<RoadApiDiagnostics> => {
-  // Modified to use the 'road' layer and include dedupe & geometry parameters
-  const layers = 'road';
-  const url = `https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/tilequery/${center[0]},${center[1]}.json?radius=${radius}&limit=10&layers=${layers}&dedupe&geometry=linestring&access_token=${accessToken}`;
+  // Modified to use the specified layer and include dedupe & geometry parameters
+  const url = `https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/tilequery/${center[0]},${center[1]}.json?radius=${radius}&limit=${limit}&layers=${layerType}&dedupe&geometry=linestring&access_token=${accessToken}`;
   
   // Create diagnostics object
   const diagnostics: RoadApiDiagnostics = {
@@ -44,7 +45,7 @@ export const testMapboxRoadQuery = async (
   };
   
   try {
-    console.log(`Testing road API at [${center[0].toFixed(5)}, ${center[1].toFixed(5)}] with radius ${radius}m using '${layers}' layer`);
+    console.log(`Testing road API at [${center[0].toFixed(5)}, ${center[1].toFixed(5)}] with radius ${radius}m using '${layerType}' layer, limit ${limit}`);
     const response = await fetch(url);
     
     // Add response status to diagnostics
@@ -57,30 +58,19 @@ export const testMapboxRoadQuery = async (
     }
     
     const data = await response.json();
-    // Store summary of response data in diagnostics
+    // Store full response data in diagnostics for debugging
+    diagnostics.rawResponse = data;
+    
+    // Update feature counts
     diagnostics.featuresCount = data.features ? data.features.length : 0;
-    diagnostics.rawResponse = {
-      type: data.type,
-      features: data.features ? 
-        data.features.map((f: any) => ({
-          id: f.id,
-          type: f.geometry.type,
-          properties: {
-            class: f.properties.class,
-            name: f.properties.name
-          }
-        })) : []
-    };
     
     // Count valid road features
     let roadFeatureCount = 0;
     
     if (data.features) {
       for (const feature of data.features) {
-        // Only count line features (roads)
-        if (feature.geometry.type === 'LineString' || feature.geometry.type === 'MultiLineString') {
-          roadFeatureCount++;
-        }
+        // Count all features that represent roads (even points can represent roads in tilequery)
+        roadFeatureCount++;
       }
     }
     
@@ -155,6 +145,8 @@ const fetchRoadsAtLocation = async (
     const roads: RoadSegment[] = [];
     
     if (data.features && data.features.length > 0) {
+      console.log(`Found ${data.features.length} road features at [${center[0].toFixed(5)}, ${center[1].toFixed(5)}]`);
+      
       // Process each road feature
       for (const feature of data.features) {
         try {
@@ -167,8 +159,23 @@ const fetchRoadsAtLocation = async (
           } else if (feature.geometry.type === 'MultiLineString') {
             // Use the first line in a MultiLineString
             coordinates = feature.geometry.coordinates[0] as [number, number][];
+          } else if (feature.geometry.type === 'Point') {
+            // For Point geometries from tilequery, we need to get the full linestring
+            // This is a simplification - ideally we'd fetch the full linestring
+            console.log("Found Point geometry for road feature, will attempt to process");
+            
+            // If tilequery returns point, we at least know there's a road here
+            // We could use this point as part of a synthetic road or marker
+            coordinates = [[feature.geometry.coordinates[0], feature.geometry.coordinates[1]]];
+            continue; // Skip for now as we can't create a proper road segment from a point
           } else {
             // Skip other geometry types
+            console.log(`Skipping unsupported geometry type: ${feature.geometry.type}`);
+            continue;
+          }
+          
+          if (coordinates.length < 2) {
+            console.log("Skipping road with insufficient coordinates");
             continue;
           }
           
@@ -202,6 +209,8 @@ const fetchRoadsAtLocation = async (
           continue;
         }
       }
+    } else {
+      console.log(`No road features found at [${center[0].toFixed(5)}, ${center[1].toFixed(5)}]`);
     }
     
     // Sort roads by length to get the longest ones
