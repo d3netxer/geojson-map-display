@@ -129,6 +129,7 @@ const calculateRoadLength = (coordinates: [number, number][]): number => {
 
 /**
  * Fetches road data for a specific location using Mapbox Tilequery API
+ * and processes the response to create RoadSegment objects
  */
 const fetchRoadsAtLocation = async (
   center: [number, number],
@@ -155,26 +156,70 @@ const fetchRoadsAtLocation = async (
     if (data.features && data.features.length > 0) {
       // Process each road feature
       for (const feature of data.features) {
-        // Skip non-LineString geometries
-        if (feature.geometry.type !== 'LineString') continue;
-        
-        // Get coordinates
-        const coordinates = feature.geometry.coordinates as [number, number][];
-        
-        // Calculate road length
-        const length = calculateRoadLength(coordinates);
-        
-        // Create a road segment
-        const roadSegment: RoadSegment = {
-          id: feature.id || `road-${Math.random().toString(36).substring(2, 10)}`,
-          name: feature.properties.name || 'Unnamed Road',
-          coordinates: coordinates,
-          congestionLevel: congestionLevel,
-          speed: speed,
-          length: length
-        };
-        
-        roads.push(roadSegment);
+        try {
+          // Extract the LineString geometry - we need to reconstruct the full road path
+          // from the point data returned by the API
+          let coordinates: [number, number][] = [];
+          
+          // Handle different geometry types from the API
+          if (feature.geometry.type === 'Point') {
+            // Point geometry requires us to create a line from the coordinate and properties
+            const pointCoord = feature.geometry.coordinates as [number, number];
+            
+            if (feature.properties.tilequery && feature.properties.tilequery.geometry === 'linestring') {
+              // Create a simple two-point line for visualization based on point and orientation
+              const angle = Math.random() * Math.PI * 2; // Random angle since we don't have orientation
+              const distance = 0.0003; // Small distance, approximately 30 meters
+              
+              coordinates = [
+                [pointCoord[0] - Math.cos(angle) * distance, pointCoord[1] - Math.sin(angle) * distance],
+                pointCoord,
+                [pointCoord[0] + Math.cos(angle) * distance, pointCoord[1] + Math.sin(angle) * distance]
+              ];
+            } else {
+              // If we don't have linestring info, skip this feature
+              continue;
+            }
+          } else if (feature.geometry.type === 'LineString') {
+            // Use the existing LineString coordinates
+            coordinates = feature.geometry.coordinates as [number, number][];
+          } else if (feature.geometry.type === 'MultiLineString') {
+            // Use the first line in a MultiLineString
+            coordinates = feature.geometry.coordinates[0] as [number, number][];
+          } else {
+            // Skip other geometry types
+            continue;
+          }
+          
+          // Calculate road length
+          const length = calculateRoadLength(coordinates);
+          
+          // Get road name
+          let name = 'Unnamed Road';
+          if (feature.properties.name_en) {
+            name = feature.properties.name_en;
+          } else if (feature.properties.name) {
+            name = feature.properties.name;
+          } else {
+            // Use road class if no name is available
+            name = `${feature.properties.class || 'Road'} ${Math.floor(Math.random() * 100)}`;
+          }
+          
+          // Create a road segment
+          const roadSegment: RoadSegment = {
+            id: `road-${feature.id || Math.random().toString(36).substring(2, 10)}`,
+            name: name,
+            coordinates: coordinates,
+            congestionLevel: congestionLevel,
+            speed: speed,
+            length: length
+          };
+          
+          roads.push(roadSegment);
+        } catch (error) {
+          console.error("Error processing road feature:", error);
+          continue;
+        }
       }
     }
     
@@ -203,6 +248,10 @@ export const findCongestedRoads = async (
   
   console.log(`Found ${congestedHexagons.length} congested hexagons`);
   
+  if (congestedHexagons.length === 0) {
+    return [];
+  }
+  
   // Collect all roads from congested hexagons
   const allRoads: RoadSegment[] = [];
   
@@ -230,11 +279,11 @@ export const findCongestedRoads = async (
     
     console.log(`Fetching roads for hexagon at [${center[0].toFixed(5)}, ${center[1].toFixed(5)}] with congestion level ${hex.properties.mean_conge.toFixed(2)}`);
     
-    // Fetch roads at this location
+    // Use a larger radius to get more roads (500m instead of 300m)
     const roads = await fetchRoadsAtLocation(
       center, 
       accessToken, 
-      300, // 300m radius
+      500, // 500m radius
       hex.properties.mean_conge || 0.7, 
       hex.properties.mean_speed
     );
