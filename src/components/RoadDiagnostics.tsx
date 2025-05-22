@@ -132,7 +132,7 @@ const RoadDiagnostics: React.FC<RoadDiagnosticsProps> = ({ apiKey, initialCoordi
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-medium">Results</h3>
               {diagnostics.success ? (
-                <Badge variant="success" className="bg-green-600">
+                <Badge variant="default" className="bg-green-600">
                   <CheckCircle className="h-4 w-4 mr-1" /> Success
                 </Badge>
               ) : (

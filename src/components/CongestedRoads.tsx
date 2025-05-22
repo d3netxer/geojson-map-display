@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { RoadSegment, RoadApiDiagnostics } from '@/lib/roadAnalysis';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import RoadDiagnostics from './RoadDiagnostics';
-import { BadgeInfo, BarChart, Road } from 'lucide-react';
+import { BadgeInfo, BarChart, MapPin } from 'lucide-react';
 
 interface CongestedRoadsProps {
   roads: RoadSegment[];
@@ -31,7 +31,7 @@ const CongestedRoads: React.FC<CongestedRoadsProps> = ({ roads, onFocusRoad, api
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
         <TabsList className="grid grid-cols-2">
           <TabsTrigger value="roads" className="flex items-center gap-2">
-            <Road size={16} />
+            <MapPin size={16} />
             <span>Road Analysis</span>
           </TabsTrigger>
           <TabsTrigger value="diagnostics" className="flex items-center gap-2">
