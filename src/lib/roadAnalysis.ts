@@ -1,4 +1,3 @@
-
 import mapboxgl from 'mapbox-gl';
 import { toast } from "sonner";
 
@@ -10,6 +9,19 @@ export interface RoadSegment {
   coordinates: [number, number][];
   length: number; // in meters
   speed?: number;
+}
+
+// Type for API response diagnostics
+export interface RoadApiDiagnostics {
+  success: boolean;
+  location: [number, number];
+  responseStatus?: number;
+  responseStatusText?: string;
+  featuresCount: number;
+  roadFeaturesCount: number;
+  errorMessage?: string;
+  requestUrl?: string;
+  rawResponse?: any;
 }
 
 /**
@@ -26,6 +38,7 @@ export const findCongestedRoads = async (
     
     // Store results
     const roadSegments: RoadSegment[] = [];
+    const diagnosticsResults: RoadApiDiagnostics[] = [];
     
     // Process the most congested hexagons first
     const sortedHexagons = [...hexagons]
@@ -55,12 +68,19 @@ export const findCongestedRoads = async (
       }
       
       try {
-        // Query real roads from Mapbox API
-        const roadsNearHexagon = await fetchNearbyRoads(center, accessToken, hexagon.properties.mean_conge);
+        // Query real roads from Mapbox API with diagnostics
+        const { roads: roadsNearHexagon, diagnostics } = await fetchNearbyRoadsWithDiagnostics(
+          center, 
+          accessToken, 
+          hexagon.properties.mean_conge
+        );
+        
+        // Store diagnostics for later analysis
+        diagnosticsResults.push(diagnostics);
         
         if (roadsNearHexagon.length === 0) {
           // If no roads found, generate synthetic roads to ensure data
-          console.log(`No actual roads found near ${center}, generating synthetic road`);
+          console.log(`No actual roads found near ${center}, generating synthetic road. Diagnostics:`, diagnostics);
           const syntheticRoad = createSyntheticRoad(center, hexagon.properties.mean_conge);
           roadSegments.push(syntheticRoad);
         } else {
@@ -71,8 +91,20 @@ export const findCongestedRoads = async (
         // Create a fallback synthetic road on error
         const syntheticRoad = createSyntheticRoad(center, hexagon.properties.mean_conge);
         roadSegments.push(syntheticRoad);
+        
+        // Add error diagnostics
+        diagnosticsResults.push({
+          success: false,
+          location: center,
+          featuresCount: 0,
+          roadFeaturesCount: 0,
+          errorMessage: error instanceof Error ? error.message : 'Unknown error'
+        });
       }
     }
+    
+    // Log overall diagnostics summary
+    logDiagnosticsSummary(diagnosticsResults);
     
     // Get unique roads (by name) and sort by congestion level
     const uniqueRoads = Array.from(
@@ -86,6 +118,11 @@ export const findCongestedRoads = async (
     ).map(([_, road]) => road);
     
     console.log(`Found ${uniqueRoads.length} unique roads`);
+    
+    // Count real vs synthetic roads
+    const syntheticCount = uniqueRoads.filter(road => road.id.startsWith('synthetic')).length;
+    const realCount = uniqueRoads.length - syntheticCount;
+    console.log(`Real roads: ${realCount}, Synthetic roads: ${syntheticCount}`);
     
     // Sort by congestion level and take the top ones
     return uniqueRoads
@@ -156,41 +193,78 @@ const createSyntheticRoad = (center: [number, number], congestionFactor: number)
 };
 
 /**
- * Fetches real roads near a specified point using Mapbox's Tilequery API
+ * Fetches real roads near a specified point with detailed diagnostics
  */
-const fetchNearbyRoads = async (
+const fetchNearbyRoadsWithDiagnostics = async (
   center: [number, number],
   accessToken: string,
   congestionFactor: number
-): Promise<RoadSegment[]> => {
+): Promise<{ roads: RoadSegment[], diagnostics: RoadApiDiagnostics }> => {
   // Using Mapbox Tilequery API to get roads near the center point
   // This queries Mapbox's vector tiles for road data
   const radius = 500; // Search radius in meters
-  const limit = 5; // Limit number of roads returned
+  const limit = 10; // Limit number of roads returned
   const layers = 'transportation'; // Road layers in Mapbox's vector tiles
   
   const url = `https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/tilequery/${center[0]},${center[1]}.json?radius=${radius}&limit=${limit}&layers=${layers}&access_token=${accessToken}`;
   
+  // Create diagnostics object
+  const diagnostics: RoadApiDiagnostics = {
+    success: false,
+    location: center,
+    featuresCount: 0,
+    roadFeaturesCount: 0,
+    requestUrl: url.replace(accessToken, 'API_KEY_HIDDEN')
+  };
+  
   try {
+    console.log(`Fetching roads near [${center[0].toFixed(5)}, ${center[1].toFixed(5)}] with radius ${radius}m`);
     const response = await fetch(url);
+    
+    // Add response status to diagnostics
+    diagnostics.responseStatus = response.status;
+    diagnostics.responseStatusText = response.statusText;
+    
     if (!response.ok) {
-      throw new Error(`Mapbox API error: ${response.status} ${response.statusText}`);
+      diagnostics.errorMessage = `Mapbox API error: ${response.status} ${response.statusText}`;
+      throw new Error(diagnostics.errorMessage);
     }
     
     const data = await response.json();
+    // Store summary of response data in diagnostics
+    diagnostics.featuresCount = data.features ? data.features.length : 0;
+    diagnostics.rawResponse = {
+      type: data.type,
+      features: data.features ? 
+        data.features.map((f: any) => ({
+          id: f.id,
+          type: f.geometry.type,
+          properties: {
+            class: f.properties.class,
+            name: f.properties.name
+          }
+        })) : []
+    };
+    
     if (!data.features || !data.features.length) {
-      console.log(`No roads found near ${center}`);
-      return [];
+      console.log(`No features found near ${center}`);
+      diagnostics.success = true; // API call was successful but returned no roads
+      return { roads: [], diagnostics };
     }
     
     // Process the returned features into road segments
     const roads: RoadSegment[] = [];
+    
+    // Count valid road features
+    let roadFeatureCount = 0;
     
     for (const feature of data.features) {
       // Only process line features (roads)
       if (feature.geometry.type !== 'LineString' && feature.geometry.type !== 'MultiLineString') {
         continue;
       }
+      
+      roadFeatureCount++;
       
       // Extract road properties
       const roadName = feature.properties.name || 'Unnamed Road';
@@ -244,10 +318,74 @@ const fetchNearbyRoads = async (
       });
     }
     
-    return roads;
+    // Update diagnostics with road-specific information
+    diagnostics.success = true;
+    diagnostics.roadFeaturesCount = roadFeatureCount;
+    
+    return { roads, diagnostics };
   } catch (error) {
     console.error("Failed to fetch nearby roads:", error);
+    diagnostics.errorMessage = error instanceof Error ? error.message : 'Unknown error';
     throw error;
+  }
+};
+
+/**
+ * Logs a summary of the diagnostics results
+ */
+const logDiagnosticsSummary = (diagnostics: RoadApiDiagnostics[]) => {
+  const total = diagnostics.length;
+  const successful = diagnostics.filter(d => d.success).length;
+  const withRoads = diagnostics.filter(d => d.roadFeaturesCount > 0).length;
+  const withoutRoads = diagnostics.filter(d => d.success && d.roadFeaturesCount === 0).length;
+  const failures = diagnostics.filter(d => !d.success).length;
+  
+  console.log(`
+Road API Diagnostics Summary:
+----------------------------
+Total API calls: ${total}
+Successful calls: ${successful} (${Math.round(successful/total*100)}%)
+Calls with road data: ${withRoads} (${Math.round(withRoads/total*100)}%)
+Calls with no road data: ${withoutRoads} (${Math.round(withoutRoads/total*100)}%)
+Failed calls: ${failures} (${Math.round(failures/total*100)}%)
+  `);
+  
+  // Log sample failures if any
+  if (failures > 0) {
+    console.log('Sample failure:', diagnostics.find(d => !d.success));
+  }
+  
+  // Log sample empty response if any
+  if (withoutRoads > 0) {
+    console.log('Sample empty response:', diagnostics.find(d => d.success && d.roadFeaturesCount === 0));
+  }
+  
+  // Log sample successful response with roads if any
+  if (withRoads > 0) {
+    console.log('Sample successful response with roads:', 
+      diagnostics.find(d => d.success && d.roadFeaturesCount > 0));
+  }
+}
+
+/**
+ * Helper function for direct diagnostic queries - can be used to test specific locations
+ */
+export const testMapboxRoadQuery = async (
+  center: [number, number],
+  accessToken: string,
+  radius: number = 500
+): Promise<RoadApiDiagnostics> => {
+  try {
+    const { diagnostics } = await fetchNearbyRoadsWithDiagnostics(center, accessToken, 0.5);
+    return diagnostics;
+  } catch (error) {
+    return {
+      success: false,
+      location: center,
+      featuresCount: 0,
+      roadFeaturesCount: 0,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error'
+    };
   }
 };
 

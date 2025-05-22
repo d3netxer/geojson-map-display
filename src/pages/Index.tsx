@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Toaster } from "sonner";
 import { toast } from "sonner";
@@ -23,12 +22,25 @@ const Index = () => {
   const [mapRef, setMapRef] = useState<any>(null);
   const [congestedRoads, setCongestedRoads] = useState<RoadSegment[]>([]);
   const [isAnalyzingRoads, setIsAnalyzingRoads] = useState<boolean>(false);
+  const [currentMapCenter, setCurrentMapCenter] = useState<[number, number]>([46.67, 24.71]);
 
   // When component mounts, check which dataset is active
   useEffect(() => {
     const currentDataset = import.meta.env.VITE_GEOJSON_SOURCE || 'default';
     setDatasetSource(currentDataset);
   }, []);
+
+  // Update map center when map moves
+  useEffect(() => {
+    if (mapRef && mapRef.on) {
+      mapRef.on('moveend', () => {
+        if (mapRef.getCenter) {
+          const center = mapRef.getCenter();
+          setCurrentMapCenter([center.lng, center.lat]);
+        }
+      });
+    }
+  }, [mapRef]);
 
   const handleApiKeySubmit = () => {
     if (mapRef) {
@@ -111,7 +123,14 @@ const Index = () => {
         if (roads.length === 0) {
           toast.warning("No road data found in the current view");
         } else {
-          toast.success(`Found ${roads.length} congested roads`);
+          const syntheticCount = roads.filter(r => r.id.startsWith('synthetic')).length;
+          const realCount = roads.length - syntheticCount;
+          
+          if (realCount > 0) {
+            toast.success(`Found ${roads.length} congested roads (${realCount} real, ${syntheticCount} synthetic)`);
+          } else {
+            toast.warning(`No real road data found. Generated ${syntheticCount} synthetic roads.`);
+          }
         }
       } else {
         toast.error("Road analysis feature not available");
@@ -220,14 +239,16 @@ const Index = () => {
       <Dialog open={showCongestedRoads} onOpenChange={setShowCongestedRoads}>
         <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Most Congested Roads Analysis</DialogTitle>
+            <DialogTitle>Road Network Analysis</DialogTitle>
             <DialogDescription>
-              Based on the hexagon congestion data, these roads are estimated to have the highest congestion levels.
+              Analysis of road congestion based on hexagon data. Use the API Diagnostics tab to test road data availability.
             </DialogDescription>
           </DialogHeader>
           <CongestedRoads 
             roads={congestedRoads} 
-            onFocusRoad={handleFocusRoad} 
+            onFocusRoad={handleFocusRoad}
+            apiKey={apiKey}
+            mapCenter={currentMapCenter}
           />
         </DialogContent>
       </Dialog>
