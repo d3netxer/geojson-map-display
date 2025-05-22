@@ -134,14 +134,15 @@ const calculateRoadLength = (coordinates: [number, number][]): number => {
 const fetchRoadsAtLocation = async (
   center: [number, number],
   accessToken: string,
-  radius: number = 300,
+  radius: number = 500,
   congestionLevel: number,
   speed?: number
 ): Promise<RoadSegment[]> => {
   try {
     // Query the Mapbox tilequery API for roads at this location
+    // Specifically limit to linestring geometry type only
     const layers = 'road';
-    const url = `https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/tilequery/${center[0]},${center[1]}.json?radius=${radius}&limit=5&layers=${layers}&dedupe&geometry=linestring&access_token=${accessToken}`;
+    const url = `https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/tilequery/${center[0]},${center[1]}.json?radius=${radius}&limit=10&layers=${layers}&dedupe&geometry=linestring&access_token=${accessToken}`;
     
     const response = await fetch(url);
     
@@ -157,30 +158,10 @@ const fetchRoadsAtLocation = async (
       // Process each road feature
       for (const feature of data.features) {
         try {
-          // Extract the LineString geometry - we need to reconstruct the full road path
-          // from the point data returned by the API
+          // Only process LineString and MultiLineString geometries
           let coordinates: [number, number][] = [];
           
-          // Handle different geometry types from the API
-          if (feature.geometry.type === 'Point') {
-            // Point geometry requires us to create a line from the coordinate and properties
-            const pointCoord = feature.geometry.coordinates as [number, number];
-            
-            if (feature.properties.tilequery && feature.properties.tilequery.geometry === 'linestring') {
-              // Create a simple two-point line for visualization based on point and orientation
-              const angle = Math.random() * Math.PI * 2; // Random angle since we don't have orientation
-              const distance = 0.0003; // Small distance, approximately 30 meters
-              
-              coordinates = [
-                [pointCoord[0] - Math.cos(angle) * distance, pointCoord[1] - Math.sin(angle) * distance],
-                pointCoord,
-                [pointCoord[0] + Math.cos(angle) * distance, pointCoord[1] + Math.sin(angle) * distance]
-              ];
-            } else {
-              // If we don't have linestring info, skip this feature
-              continue;
-            }
-          } else if (feature.geometry.type === 'LineString') {
+          if (feature.geometry.type === 'LineString') {
             // Use the existing LineString coordinates
             coordinates = feature.geometry.coordinates as [number, number][];
           } else if (feature.geometry.type === 'MultiLineString') {
@@ -223,7 +204,8 @@ const fetchRoadsAtLocation = async (
       }
     }
     
-    return roads;
+    // Sort roads by length to get the longest ones
+    return roads.sort((a, b) => b.length - a.length);
   } catch (error) {
     console.error("Failed to fetch roads at location:", error);
     return [];
@@ -244,7 +226,7 @@ export const findCongestedRoads = async (
   const congestedHexagons = [...hexagons]
     .filter(hex => hex.properties && hex.properties.mean_conge > 0.5)
     .sort((a, b) => b.properties.mean_conge - a.properties.mean_conge)
-    .slice(0, limit);
+    .slice(0, 10); // Get top 10 most congested hexagons
   
   console.log(`Found ${congestedHexagons.length} congested hexagons`);
   
@@ -279,7 +261,7 @@ export const findCongestedRoads = async (
     
     console.log(`Fetching roads for hexagon at [${center[0].toFixed(5)}, ${center[1].toFixed(5)}] with congestion level ${hex.properties.mean_conge.toFixed(2)}`);
     
-    // Use a larger radius to get more roads (500m instead of 300m)
+    // Fetch roads at this location with a 500m radius and get longest roads
     const roads = await fetchRoadsAtLocation(
       center, 
       accessToken, 
@@ -290,8 +272,11 @@ export const findCongestedRoads = async (
     
     console.log(`Found ${roads.length} roads at hexagon location`);
     
+    // Get only the longest roads from this hexagon (up to 10)
+    const longestRoads = roads.slice(0, 10);
+    
     // Add non-duplicate roads to the result
-    for (const road of roads) {
+    for (const road of longestRoads) {
       if (!processedRoadIds.has(road.id)) {
         processedRoadIds.add(road.id);
         allRoads.push(road);
@@ -299,16 +284,21 @@ export const findCongestedRoads = async (
     }
   }
   
+  // Sort all collected roads by length and take the top ones up to the limit
+  const topRoads = allRoads
+    .sort((a, b) => b.length - a.length)
+    .slice(0, limit);
+  
   // If no real roads were found, fall back to synthetic roads as a backup
-  if (allRoads.length === 0) {
+  if (topRoads.length === 0) {
     console.warn("No real road data found, generating synthetic roads as fallback");
     return generateSyntheticRoads(congestedHexagons);
   }
   
-  console.log(`Returning ${allRoads.length} unique roads`);
+  console.log(`Returning ${topRoads.length} unique longest roads`);
   
-  // Return all found roads
-  return allRoads;
+  // Return top roads
+  return topRoads;
 };
 
 /**
