@@ -8,6 +8,8 @@ export interface RoadSegment {
   congestionLevel: number;
   speed?: number;
   length: number;
+  // New property to track which hexagon this road belongs to
+  hexagonId?: string;
 }
 
 export interface RoadApiDiagnostics {
@@ -198,7 +200,8 @@ const fetchRoadsAtLocation = async (
   accessToken: string,
   radius: number = 500,
   congestionLevel: number,
-  speed?: number
+  speed?: number,
+  hexagonId?: string // Add hexagonId parameter to track source hexagon
 ): Promise<RoadSegment[]> => {
   try {
     // Query the Mapbox tilequery API for roads at this location
@@ -275,7 +278,8 @@ const fetchRoadsAtLocation = async (
             coordinates: coordinates,
             congestionLevel: congestionLevel,
             speed: speed,
-            length: length
+            length: length,
+            hexagonId: hexagonId // Add the hexagon ID to track its source
           };
           
           roads.push(roadSegment);
@@ -299,6 +303,7 @@ const fetchRoadsAtLocation = async (
 /**
  * Finds congested roads based on hexagon data
  * This will query the Mapbox API for road data and combine it with congestion data
+ * Modified to return the longest road from each of the top congested hexagons
  */
 export const findCongestedRoads = async (
   map: any,
@@ -318,16 +323,14 @@ export const findCongestedRoads = async (
     return [];
   }
   
-  // Collect all roads from congested hexagons
-  const allRoads: RoadSegment[] = [];
+  // Array to store the longest road per hexagon
+  const longestRoadPerHexagon: RoadSegment[] = [];
   
-  // Keep track of already processed roads to avoid duplicates
-  const processedRoadIds = new Set<string>();
-  
-  // For each congested hexagon, fetch the roads in its area
+  // For each congested hexagon, fetch the roads and keep only the longest one
   for (const hex of congestedHexagons) {
     // Extract the center point of the hexagon
     let center: [number, number] = [0, 0];
+    const hexagonId = hex.properties.GRID_ID || `hex-${Math.random().toString(36).substring(2, 10)}`;
     
     if (hex.geometry.type === 'Polygon') {
       // Calculate center of polygon
@@ -343,46 +346,110 @@ export const findCongestedRoads = async (
       center = [sumX / coords.length, sumY / coords.length];
     }
     
-    console.log(`Fetching roads for hexagon at [${center[0].toFixed(5)}, ${center[1].toFixed(5)}] with congestion level ${hex.properties.mean_conge.toFixed(2)}`);
+    console.log(`Fetching roads for hexagon ${hexagonId} at [${center[0].toFixed(5)}, ${center[1].toFixed(5)}] with congestion level ${hex.properties.mean_conge.toFixed(2)}`);
     
-    // Fetch roads at this location with a 500m radius and get longest roads
+    // Fetch roads at this location with a 500m radius
     const roads = await fetchRoadsAtLocation(
       center, 
       accessToken, 
       500, // 500m radius
       hex.properties.mean_conge || 0.7, 
-      hex.properties.mean_speed
+      hex.properties.mean_speed,
+      hexagonId // Pass the hexagon ID
     );
     
-    console.log(`Found ${roads.length} roads at hexagon location`);
+    console.log(`Found ${roads.length} roads at hexagon ${hexagonId}`);
     
-    // Get only the longest roads from this hexagon (up to 10)
-    const longestRoads = roads.slice(0, 10);
-    
-    // Add non-duplicate roads to the result
-    for (const road of longestRoads) {
-      if (!processedRoadIds.has(road.id)) {
-        processedRoadIds.add(road.id);
-        allRoads.push(road);
-      }
+    // Get the longest road from this hexagon, if any roads were found
+    if (roads.length > 0) {
+      // Roads are already sorted by length (longest first)
+      const longestRoad = roads[0];
+      longestRoadPerHexagon.push(longestRoad);
+      console.log(`Added longest road "${longestRoad.name}" (${longestRoad.length.toFixed(0)}m) from hexagon ${hexagonId}`);
+    } else {
+      console.log(`No roads found for hexagon ${hexagonId}, will generate synthetic road`);
+      
+      // Generate a synthetic road for this hexagon
+      const syntheticRoad = generateSyntheticRoadForHexagon(hex, hexagonId);
+      longestRoadPerHexagon.push(syntheticRoad);
+      console.log(`Added synthetic road "${syntheticRoad.name}" (${syntheticRoad.length.toFixed(0)}m) for hexagon ${hexagonId}`);
     }
   }
   
-  // Sort all collected roads by length and take the top ones up to the limit
-  const topRoads = allRoads
-    .sort((a, b) => b.length - a.length)
-    .slice(0, limit);
-  
-  // If no real roads were found, fall back to synthetic roads as a backup
-  if (topRoads.length === 0) {
-    console.warn("No real road data found, generating synthetic roads as fallback");
+  // If no real roads were found in any hexagon, return synthetic roads as fallback
+  if (longestRoadPerHexagon.length === 0) {
+    console.warn("No roads found in any hexagon, generating synthetic roads as fallback");
     return generateSyntheticRoads(congestedHexagons);
   }
   
-  console.log(`Returning ${topRoads.length} unique longest roads`);
+  console.log(`Returning ${longestRoadPerHexagon.length} roads (one longest road per hexagon)`);
   
-  // Return top roads
-  return topRoads;
+  // Return one longest road per hexagon
+  return longestRoadPerHexagon;
+};
+
+/**
+ * Generate a synthetic road for a single hexagon
+ */
+const generateSyntheticRoadForHexagon = (hex: any, hexagonId: string): RoadSegment => {
+  // Extract the center point of the hexagon
+  let center: [number, number] = [0, 0];
+  
+  if (hex.geometry.type === 'Polygon') {
+    // Calculate center of polygon
+    const coords = hex.geometry.coordinates[0];
+    const sumX = coords.reduce((sum: number, coord: number[]) => sum + coord[0], 0);
+    const sumY = coords.reduce((sum: number, coord: number[]) => sum + coord[1], 0);
+    center = [sumX / coords.length, sumY / coords.length];
+  } else if (hex.geometry.type === 'MultiPolygon') {
+    // Use the first polygon
+    const coords = hex.geometry.coordinates[0][0];
+    const sumX = coords.reduce((sum: number, coord: number[]) => sum + coord[0], 0);
+    const sumY = coords.reduce((sum: number, coord: number[]) => sum + coord[1], 0);
+    center = [sumX / coords.length, sumY / coords.length];
+  }
+  
+  // Create a synthetic road
+  const roadLength = Math.random() * 1000 + 500; // 500-1500 meters
+  const angle = Math.random() * Math.PI * 2; // Random angle in radians
+  
+  // Create start and end points for the road
+  const start: [number, number] = [
+    center[0] - Math.cos(angle) * roadLength / 200000,
+    center[1] - Math.sin(angle) * roadLength / 200000
+  ];
+  
+  const end: [number, number] = [
+    center[0] + Math.cos(angle) * roadLength / 200000,
+    center[1] + Math.sin(angle) * roadLength / 200000
+  ];
+  
+  // Create additional points along the road for a more realistic appearance
+  const numPoints = Math.floor(roadLength / 100) + 2; // One point per 100m
+  const coordinates: [number, number][] = [];
+  
+  for (let j = 0; j < numPoints; j++) {
+    const fraction = j / (numPoints - 1);
+    // Add slight randomness to make it look more natural
+    const jitter = (Math.random() - 0.5) * 0.0001;
+    coordinates.push([
+      start[0] + (end[0] - start[0]) * fraction + jitter,
+      start[1] + (end[1] - start[1]) * fraction + jitter
+    ]);
+  }
+  
+  // Create the road segment
+  const syntheticRoad: RoadSegment = {
+    id: `synthetic-road-${hexagonId}`,
+    name: `Synthetic Road ${hexagonId}`,
+    coordinates,
+    congestionLevel: hex.properties.mean_conge || 0.7,
+    speed: hex.properties.mean_speed || 30,
+    length: roadLength,
+    hexagonId: hexagonId
+  };
+  
+  return syntheticRoad;
 };
 
 /**
@@ -394,63 +461,9 @@ const generateSyntheticRoads = (congestedHexagons: any[]): RoadSegment[] => {
   // Create a synthetic road for each congested hexagon
   for (let i = 0; i < congestedHexagons.length; i++) {
     const hex = congestedHexagons[i];
+    const hexagonId = hex.properties.GRID_ID || `hex-${i + 1}`;
     
-    // Extract the center point of the hexagon
-    let center: [number, number] = [0, 0];
-    
-    if (hex.geometry.type === 'Polygon') {
-      // Calculate center of polygon
-      const coords = hex.geometry.coordinates[0];
-      const sumX = coords.reduce((sum: number, coord: number[]) => sum + coord[0], 0);
-      const sumY = coords.reduce((sum: number, coord: number[]) => sum + coord[1], 0);
-      center = [sumX / coords.length, sumY / coords.length];
-    } else if (hex.geometry.type === 'MultiPolygon') {
-      // Use the first polygon
-      const coords = hex.geometry.coordinates[0][0];
-      const sumX = coords.reduce((sum: number, coord: number[]) => sum + coord[0], 0);
-      const sumY = coords.reduce((sum: number, coord: number[]) => sum + coord[1], 0);
-      center = [sumX / coords.length, sumY / coords.length];
-    }
-    
-    // Create a synthetic road
-    const roadLength = Math.random() * 1000 + 500; // 500-1500 meters
-    const angle = Math.random() * Math.PI * 2; // Random angle in radians
-    
-    // Create start and end points for the road
-    const start: [number, number] = [
-      center[0] - Math.cos(angle) * roadLength / 200000,
-      center[1] - Math.sin(angle) * roadLength / 200000
-    ];
-    
-    const end: [number, number] = [
-      center[0] + Math.cos(angle) * roadLength / 200000,
-      center[1] + Math.sin(angle) * roadLength / 200000
-    ];
-    
-    // Create additional points along the road for a more realistic appearance
-    const numPoints = Math.floor(roadLength / 100) + 2; // One point per 100m
-    const coordinates: [number, number][] = [];
-    
-    for (let j = 0; j < numPoints; j++) {
-      const fraction = j / (numPoints - 1);
-      // Add slight randomness to make it look more natural
-      const jitter = (Math.random() - 0.5) * 0.0001;
-      coordinates.push([
-        start[0] + (end[0] - start[0]) * fraction + jitter,
-        start[1] + (end[1] - start[1]) * fraction + jitter
-      ]);
-    }
-    
-    // Create the road segment
-    const syntheticRoad: RoadSegment = {
-      id: `synthetic-road-${i + 1}`,
-      name: `Synthetic Road ${i + 1}`,
-      coordinates,
-      congestionLevel: hex.properties.mean_conge || 0.7,
-      speed: hex.properties.mean_speed || 30,
-      length: roadLength
-    };
-    
+    const syntheticRoad = generateSyntheticRoadForHexagon(hex, hexagonId);
     syntheticRoads.push(syntheticRoad);
   }
   
