@@ -33,7 +33,7 @@ export const testMapboxRoadQuery = async (
   layerType: string = 'road'
 ): Promise<RoadApiDiagnostics> => {
   // Modified to use the specified layer and include dedupe & geometry parameters
-  const url = `https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/tilequery/${center[0]},${center[1]}.json?radius=${radius}&limit=${limit}&layers=${layerType}&dedupe&geometry=linestring&access_token=${accessToken}`;
+  const url = `https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/tilequery/${center[0]},${center[1]}.json?radius=${radius}&limit=${limit}&layers=${layerType}&dedupe&access_token=${accessToken}`;
   
   // Create diagnostics object
   const diagnostics: RoadApiDiagnostics = {
@@ -118,6 +118,78 @@ const calculateRoadLength = (coordinates: [number, number][]): number => {
 };
 
 /**
+ * Creates a path from a road point and bearing data
+ * Used when the API returns points instead of linestrings
+ */
+const createPathFromPoint = (point: [number, number], bearing: number | undefined, length: number = 100): [number, number][] => {
+  if (!bearing) {
+    // If no bearing provided, create a short path in east and west directions
+    const lon = point[0];
+    const lat = point[1];
+    // Create a short path (around 50m in both directions)
+    const lonOffset = 0.0005; // roughly 50m at equator
+    return [
+      [lon - lonOffset, lat],
+      [lon, lat],
+      [lon + lonOffset, lat]
+    ];
+  }
+  
+  // Calculate start and end points based on bearing
+  // Convert bearing to radians (bearing is in degrees, 0 = north, 90 = east)
+  const bearingRad = (bearing * Math.PI) / 180;
+  
+  // Earth radius in meters
+  const R = 6371000;
+  
+  // Length in km for point extension
+  const pathLength = length / 1000;
+  
+  const lat1 = point[1] * Math.PI / 180;
+  const lon1 = point[0] * Math.PI / 180;
+  
+  // Calculate backward point (opposite bearing)
+  const oppositeBearing = (bearing + 180) % 360;
+  const oppositeBearingRad = (oppositeBearing * Math.PI) / 180;
+  
+  // Calculate backward point
+  const lat2Back = Math.asin(
+    Math.sin(lat1) * Math.cos(pathLength/R) +
+    Math.cos(lat1) * Math.sin(pathLength/R) * Math.cos(oppositeBearingRad)
+  );
+  
+  const lon2Back = lon1 + Math.atan2(
+    Math.sin(oppositeBearingRad) * Math.sin(pathLength/R) * Math.cos(lat1),
+    Math.cos(pathLength/R) - Math.sin(lat1) * Math.sin(lat2Back)
+  );
+  
+  // Calculate forward point
+  const lat2Forward = Math.asin(
+    Math.sin(lat1) * Math.cos(pathLength/R) +
+    Math.cos(lat1) * Math.sin(pathLength/R) * Math.cos(bearingRad)
+  );
+  
+  const lon2Forward = lon1 + Math.atan2(
+    Math.sin(bearingRad) * Math.sin(pathLength/R) * Math.cos(lat1),
+    Math.cos(pathLength/R) - Math.sin(lat1) * Math.sin(lat2Forward)
+  );
+  
+  // Convert back to degrees
+  const backPoint: [number, number] = [
+    (lon2Back * 180 / Math.PI), 
+    (lat2Back * 180 / Math.PI)
+  ];
+  
+  const forwardPoint: [number, number] = [
+    (lon2Forward * 180 / Math.PI),
+    (lat2Forward * 180 / Math.PI)
+  ];
+  
+  // Return array with 3 points: backward, original, forward
+  return [backPoint, point, forwardPoint];
+};
+
+/**
  * Fetches road data for a specific location using Mapbox Tilequery API
  * and processes the response to create RoadSegment objects
  */
@@ -130,9 +202,9 @@ const fetchRoadsAtLocation = async (
 ): Promise<RoadSegment[]> => {
   try {
     // Query the Mapbox tilequery API for roads at this location
-    // Specifically limit to linestring geometry type only
     const layers = 'road';
-    const url = `https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/tilequery/${center[0]},${center[1]}.json?radius=${radius}&limit=10&layers=${layers}&dedupe&geometry=linestring&access_token=${accessToken}`;
+    // Note: We've removed the 'geometry=linestring' filter to get ALL types of road geometries
+    const url = `https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/tilequery/${center[0]},${center[1]}.json?radius=${radius}&limit=10&layers=${layers}&dedupe&access_token=${accessToken}`;
     
     const response = await fetch(url);
     
@@ -150,24 +222,27 @@ const fetchRoadsAtLocation = async (
       // Process each road feature
       for (const feature of data.features) {
         try {
-          // Only process LineString and MultiLineString geometries
+          // Process different geometry types
           let coordinates: [number, number][] = [];
           
           if (feature.geometry.type === 'LineString') {
             // Use the existing LineString coordinates
             coordinates = feature.geometry.coordinates as [number, number][];
+            console.log("Processing LineString geometry");
           } else if (feature.geometry.type === 'MultiLineString') {
             // Use the first line in a MultiLineString
             coordinates = feature.geometry.coordinates[0] as [number, number][];
+            console.log("Processing MultiLineString geometry");
           } else if (feature.geometry.type === 'Point') {
-            // For Point geometries from tilequery, we need to get the full linestring
-            // This is a simplification - ideally we'd fetch the full linestring
-            console.log("Found Point geometry for road feature, will attempt to process");
+            // For Point geometries, create a synthetic path based on bearing if available
+            console.log("Processing Point geometry with properties:", feature.properties);
             
-            // If tilequery returns point, we at least know there's a road here
-            // We could use this point as part of a synthetic road or marker
-            coordinates = [[feature.geometry.coordinates[0], feature.geometry.coordinates[1]]];
-            continue; // Skip for now as we can't create a proper road segment from a point
+            const point: [number, number] = [feature.geometry.coordinates[0], feature.geometry.coordinates[1]];
+            const bearing = feature.properties.bearing;
+            
+            // Create a path from the point, either based on bearing or just a small line segment
+            coordinates = createPathFromPoint(point, bearing, 100);
+            console.log(`Created synthetic path from point with ${coordinates.length} coordinates`);
           } else {
             // Skip other geometry types
             console.log(`Skipping unsupported geometry type: ${feature.geometry.type}`);
