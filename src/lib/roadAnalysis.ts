@@ -52,12 +52,13 @@ export const findCongestedRoads = async (
         continue;
       }
       
-      // Call Mapbox API to get roads near this hexagon
-      // In a real application, you would use the Mapbox Directions API or the Isochrone API
-      // Here we'll simulate the response with nearby roads
-      const simulatedRoads = await simulateNearbyRoads(center, hexagon.properties.mean_conge);
-      
-      roadSegments.push(...simulatedRoads);
+      try {
+        // Query real roads from Mapbox API
+        const roadsNearHexagon = await fetchNearbyRoads(center, accessToken, hexagon.properties.mean_conge);
+        roadSegments.push(...roadsNearHexagon);
+      } catch (error) {
+        console.error(`Failed to fetch roads for hexagon at ${center}:`, error);
+      }
     }
     
     // Get unique roads (by name) and sort by congestion level
@@ -83,92 +84,140 @@ export const findCongestedRoads = async (
 };
 
 /**
- * This is a simulation function that would be replaced with actual API calls
- * in a production environment using the Mapbox Directions API
+ * Fetches real roads near a specified point using Mapbox's Tilequery API
  */
-const simulateNearbyRoads = async (
+const fetchNearbyRoads = async (
   center: [number, number],
-  congestionLevel: number
+  accessToken: string,
+  congestionFactor: number
 ): Promise<RoadSegment[]> => {
-  // In a real implementation, you would make API calls to Mapbox or Google Maps
-  // For demonstration purposes, we'll generate some simulated roads
+  // Using Mapbox Tilequery API to get roads near the center point
+  // This queries Mapbox's vector tiles for road data
+  const radius = 500; // Search radius in meters
+  const limit = 5; // Limit number of roads returned
+  const layers = 'transportation'; // Road layers in Mapbox's vector tiles
   
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 300));
+  const url = `https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/tilequery/${center[0]},${center[1]}.json?radius=${radius}&limit=${limit}&layers=${layers}&access_token=${accessToken}`;
   
-  // Generate 1-3 roads per hexagon
-  const roadCount = Math.floor(Math.random() * 3) + 1;
-  const roads: RoadSegment[] = [];
-  
-  // List of common road names
-  const roadNames = [
-    "King Fahd Road", "Olaya Street", "King Abdullah Road", "Makkah Road", 
-    "Takhassusi Street", "Prince Turki Bin Abdulaziz Al Awwal Road", 
-    "King Khalid Road", "Al Imam Saud Ibn Abdul Aziz Branch Road"
-  ];
-  
-  // Generate simulated roads with congestion levels influenced by the hexagon's congestion
-  for (let i = 0; i < roadCount; i++) {
-    const jitter = (Math.random() - 0.5) * 0.2; // Add some randomness
-    const name = roadNames[Math.floor(Math.random() * roadNames.length)];
-    const roadCongestion = Math.max(0, Math.min(1, congestionLevel * (0.8 + Math.random() * 0.4)));
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Mapbox API error: ${response.status} ${response.statusText}`);
+    }
     
-    // Create a road segment with multiple coordinates to form a curved line
-    const length = Math.random() * 1000 + 500; // 500-1500 meters
-    const bearing = Math.random() * 360; // random direction
+    const data = await response.json();
+    if (!data.features || !data.features.length) {
+      console.log(`No roads found near ${center}`);
+      return [];
+    }
     
-    // Generate a more realistic road with curves
-    const coordinates = generateRealisticRoadShape(center, bearing, length);
+    // Process the returned features into road segments
+    const roads: RoadSegment[] = [];
     
-    roads.push({
-      id: `road-${center[0]}-${center[1]}-${i}`,
-      name: name + (Math.random() > 0.7 ? " (North)" : Math.random() > 0.5 ? " (South)" : ""),
-      congestionLevel: roadCongestion,
-      coordinates,
-      length,
-      speed: Math.max(5, 60 * (1 - roadCongestion)) // Speed in km/h, inversely proportional to congestion
-    });
+    for (const feature of data.features) {
+      // Only process line features (roads)
+      if (feature.geometry.type !== 'LineString' && feature.geometry.type !== 'MultiLineString') {
+        continue;
+      }
+      
+      // Extract road properties
+      const roadName = feature.properties.name || 'Unnamed Road';
+      const roadClass = feature.properties.class || 'street';
+      
+      // Get coordinates
+      let coordinates: [number, number][];
+      if (feature.geometry.type === 'LineString') {
+        coordinates = feature.geometry.coordinates;
+      } else {
+        // Take first line from MultiLineString
+        coordinates = feature.geometry.coordinates[0];
+      }
+      
+      // Calculate road length
+      let length = 0;
+      for (let i = 1; i < coordinates.length; i++) {
+        length += calculateDistance(coordinates[i-1], coordinates[i]);
+      }
+      
+      // Determine congestion level based on hexagon's congestion factor
+      // and some road properties (more congested for major roads)
+      let baseCongestion = congestionFactor;
+      
+      // Adjust based on road class (major roads are more congested)
+      if (['primary', 'trunk', 'motorway'].includes(roadClass)) {
+        baseCongestion = Math.min(1, baseCongestion * 1.3);
+      } else if (['secondary', 'tertiary'].includes(roadClass)) {
+        baseCongestion = Math.min(1, baseCongestion * 1.1);
+      }
+      
+      // Add some randomness for variety
+      const congestionLevel = Math.max(0, Math.min(1, 
+        baseCongestion * (0.8 + Math.random() * 0.4)
+      ));
+      
+      // Calculate estimated speed based on congestion
+      const baseSpeed = getBaseSpeedForRoadClass(roadClass);
+      const speed = baseSpeed * (1 - congestionLevel * 0.8);
+      
+      // Generate a unique ID for this road segment
+      const id = `road-${roadClass}-${roadName.replace(/\s+/g, '-')}-${Math.round(center[0]*10000)}`;
+      
+      roads.push({
+        id,
+        name: roadName,
+        congestionLevel,
+        coordinates,
+        length,
+        speed
+      });
+    }
+    
+    return roads;
+  } catch (error) {
+    console.error("Failed to fetch nearby roads:", error);
+    throw error;
   }
-  
-  return roads;
 };
 
 /**
- * Generates a realistic road shape with natural curves
+ * Calculate the distance between two points in meters
  */
-const generateRealisticRoadShape = (
-  start: [number, number], 
-  initialBearing: number, 
-  totalLength: number
-): [number, number][] => {
-  // Number of segments to create (more segments = more detailed road)
-  const numSegments = Math.floor(Math.random() * 5) + 7; // 7-12 segments
+const calculateDistance = (point1: [number, number], point2: [number, number]): number => {
+  // Haversine formula to calculate distance between two points on Earth
+  const R = 6371000; // Earth radius in meters
+  const φ1 = point1[1] * Math.PI / 180;
+  const φ2 = point2[1] * Math.PI / 180;
+  const Δφ = (point2[1] - point1[1]) * Math.PI / 180;
+  const Δλ = (point2[0] - point1[0]) * Math.PI / 180;
   
-  // Initialize coordinates array with start point
-  const coordinates: [number, number][] = [start];
+  const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+           Math.cos(φ1) * Math.cos(φ2) *
+           Math.sin(Δλ/2) * Math.sin(Δλ/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   
-  // Track current position and bearing
-  let currentPoint = start;
-  let currentBearing = initialBearing;
-  let remainingLength = totalLength;
-  
-  // Create intermediate points with natural curves
-  for (let i = 0; i < numSegments - 1; i++) {
-    // Determine segment length (not uniform)
-    const segmentLength = remainingLength / (numSegments - i) * (0.7 + Math.random() * 0.6);
-    remainingLength -= segmentLength;
-    
-    // Add some natural variation to the bearing
-    // Roads tend to maintain their general direction but with slight curves
-    const bearingChange = (Math.random() - 0.5) * 30; // -15 to 15 degree variation
-    currentBearing = (currentBearing + bearingChange) % 360;
-    
-    // Calculate next point
-    currentPoint = mapPointAtBearing(currentPoint, currentBearing, segmentLength);
-    coordinates.push(currentPoint);
+  return R * c;
+};
+
+/**
+ * Get the base speed for different road classes in km/h
+ */
+const getBaseSpeedForRoadClass = (roadClass: string): number => {
+  switch (roadClass) {
+    case 'motorway':
+      return 120;
+    case 'trunk':
+      return 100;
+    case 'primary':
+      return 80;
+    case 'secondary':
+      return 60;
+    case 'tertiary':
+      return 50;
+    case 'residential':
+      return 30;
+    default:
+      return 40;
   }
-  
-  return coordinates;
 };
 
 // Helper function to calculate a new point given a starting point, bearing and distance
