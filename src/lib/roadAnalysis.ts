@@ -113,25 +113,12 @@ const simulateNearbyRoads = async (
     const name = roadNames[Math.floor(Math.random() * roadNames.length)];
     const roadCongestion = Math.max(0, Math.min(1, congestionLevel * (0.8 + Math.random() * 0.4)));
     
-    // Create a road segment with multiple coordinates to form a line
+    // Create a road segment with multiple coordinates to form a curved line
     const length = Math.random() * 1000 + 500; // 500-1500 meters
     const bearing = Math.random() * 360; // random direction
-    const coordinates: [number, number][] = [];
     
-    // Create a simple line with 3 points
-    coordinates.push(center);
-    
-    // Second point (midpoint with some randomness)
-    const mid = mapPointAtBearing(center, bearing, length/2);
-    const midWithJitter: [number, number] = [
-      mid[0] + (Math.random() - 0.5) * 0.001,
-      mid[1] + (Math.random() - 0.5) * 0.001
-    ];
-    coordinates.push(midWithJitter);
-    
-    // End point
-    const end = mapPointAtBearing(center, bearing, length);
-    coordinates.push(end);
+    // Generate a more realistic road with curves
+    const coordinates = generateRealisticRoadShape(center, bearing, length);
     
     roads.push({
       id: `road-${center[0]}-${center[1]}-${i}`,
@@ -144,6 +131,44 @@ const simulateNearbyRoads = async (
   }
   
   return roads;
+};
+
+/**
+ * Generates a realistic road shape with natural curves
+ */
+const generateRealisticRoadShape = (
+  start: [number, number], 
+  initialBearing: number, 
+  totalLength: number
+): [number, number][] => {
+  // Number of segments to create (more segments = more detailed road)
+  const numSegments = Math.floor(Math.random() * 5) + 7; // 7-12 segments
+  
+  // Initialize coordinates array with start point
+  const coordinates: [number, number][] = [start];
+  
+  // Track current position and bearing
+  let currentPoint = start;
+  let currentBearing = initialBearing;
+  let remainingLength = totalLength;
+  
+  // Create intermediate points with natural curves
+  for (let i = 0; i < numSegments - 1; i++) {
+    // Determine segment length (not uniform)
+    const segmentLength = remainingLength / (numSegments - i) * (0.7 + Math.random() * 0.6);
+    remainingLength -= segmentLength;
+    
+    // Add some natural variation to the bearing
+    // Roads tend to maintain their general direction but with slight curves
+    const bearingChange = (Math.random() - 0.5) * 30; // -15 to 15 degree variation
+    currentBearing = (currentBearing + bearingChange) % 360;
+    
+    // Calculate next point
+    currentPoint = mapPointAtBearing(currentPoint, currentBearing, segmentLength);
+    coordinates.push(currentPoint);
+  }
+  
+  return coordinates;
 };
 
 // Helper function to calculate a new point given a starting point, bearing and distance
@@ -176,4 +201,3 @@ const mapPointAtBearing = (
   
   return [lon2 * 180 / Math.PI, lat2 * 180 / Math.PI];
 };
-
