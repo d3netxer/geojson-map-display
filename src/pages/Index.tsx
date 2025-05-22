@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Toaster } from "sonner";
 import { toast } from "sonner";
@@ -127,10 +126,11 @@ const Index = () => {
         } else {
           const syntheticCount = roads.filter(r => r.id.startsWith('synthetic')).length;
           const realCount = roads.length - syntheticCount;
-          const enhancedGeometryCount = roads.filter(r => r.coordinates.length > 10).length;
+          const enhancedGeometryCount = roads.filter(r => r.coordinates.length > 5).length;
           
           if (realCount > 0) {
-            toast.success(`Found ${roads.length} congested roads (${enhancedGeometryCount} with enhanced geometry)`);
+            const withDetailedGeometry = roads.filter(r => r.coordinates.length > 10).length;
+            toast.success(`Found ${roads.length} congested roads (${withDetailedGeometry} with detailed geometry)`);
           } else {
             toast.warning(`No real road data found. Generated ${syntheticCount} synthetic roads.`);
           }
@@ -169,7 +169,7 @@ const Index = () => {
         disabled={isAnalyzingRoads}
       >
         <RadarIcon size={16} />
-        {isAnalyzingRoads ? 'Analyzing...' : 'Analyze Roads'}
+        {isAnalyzingRoads ? 'Analyzing...' : 'Find & Map Roads'}
       </Button>
       
       {/* Dataset Toggle Button */}

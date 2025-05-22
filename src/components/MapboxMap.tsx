@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { ArrowDown, Layers, Maximize2, BarChart3, Info } from 'lucide-react';
@@ -574,11 +573,25 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
       // Set the line opacity for roads-highlight to enable hovering
       map.current.setPaintProperty('roads-highlight', 'line-opacity', 0.01);
       
-      // Add debug information about road geometries
+      // Enhanced debugging for road geometries
       const coordinateCounts = roads.map(r => r.coordinates.length);
       const avgCoords = coordinateCounts.reduce((acc, val) => acc + val, 0) / roads.length;
+      const totalPoints = coordinateCounts.reduce((acc, val) => acc + val, 0);
+      
       console.log(`Average coordinates per road: ${avgCoords.toFixed(1)}`);
       console.log(`Road coordinate counts: Min=${Math.min(...coordinateCounts)}, Max=${Math.max(...coordinateCounts)}`);
+      console.log(`Total road points rendered: ${totalPoints}`);
+      
+      // Log each road for debugging
+      roads.forEach((road, index) => {
+        console.log(`Road ${index+1}: "${road.name}" - ${road.coordinates.length} points, ${road.length.toFixed(0)}m`);
+      });
+      
+      // Display roads with detailed geometry in toast
+      const enhancedRoads = roads.filter(r => r.coordinates.length > 5);
+      if (enhancedRoads.length > 0) {
+        toast.success(`Rendering ${enhancedRoads.length} roads with detailed geometries`);
+      }
       
     } catch (error) {
       console.error('Error rendering congested roads:', error);
@@ -618,6 +631,8 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
     }
     
     try {
+      toast.info("Querying road network data...");
+      
       // Find congested roads based on hexagon data
       const roads = await findCongestedRoads(
         map.current,
@@ -626,8 +641,21 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
         10 // Limit to top 10 roads
       );
       
-      // Render the roads on the map
-      renderCongestedRoads(roads);
+      if (roads.length > 0) {
+        // Render the roads on the map
+        renderCongestedRoads(roads);
+        
+        // Count roads with detailed geometry
+        const detailedRoads = roads.filter(r => r.coordinates.length > 5);
+        
+        if (detailedRoads.length > 0) {
+          toast.success(`Successfully rendered ${detailedRoads.length} roads with detailed geometry!`);
+        } else {
+          toast.info("Roads were found but detailed geometry could not be obtained. Showing simplified geometries.");
+        }
+      } else {
+        toast.warning("No road data found for the selected area.");
+      }
       
       return roads;
     } catch (error) {
