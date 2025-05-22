@@ -64,6 +64,12 @@ const RoadDiagnostics: React.FC<RoadDiagnosticsProps> = ({ apiKey, initialCoordi
     setLatitude(location.coords[1].toString());
   };
 
+  // Generate the API query URL for display
+  const generateApiQueryUrl = () => {
+    const coordinates: [number, number] = [parseFloat(longitude), parseFloat(latitude)];
+    return `https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/tilequery/${coordinates[0]},${coordinates[1]}.json?radius=${radius}&limit=10&layers=${layer}&dedupe&geometry=linestring&access_token=API_KEY_HIDDEN`;
+  };
+
   return (
     <Card className="w-full">
       <CardHeader>
@@ -167,6 +173,15 @@ const RoadDiagnostics: React.FC<RoadDiagnosticsProps> = ({ apiKey, initialCoordi
           </div>
         </div>
         
+        <div>
+          <label htmlFor="api-query" className="text-sm font-medium">
+            API Query URL
+          </label>
+          <div className="mt-1 p-2 bg-slate-100 text-xs rounded font-mono break-all">
+            {generateApiQueryUrl()}
+          </div>
+        </div>
+        
         <Button 
           onClick={handleTest} 
           disabled={loading}
@@ -210,6 +225,9 @@ const RoadDiagnostics: React.FC<RoadDiagnosticsProps> = ({ apiKey, initialCoordi
               
               <div className="font-medium">Coordinates</div>
               <div>[{diagnostics.location[0].toFixed(5)}, {diagnostics.location[1].toFixed(5)}]</div>
+              
+              <div className="font-medium">API Request URL</div>
+              <div className="text-xs break-all">{diagnostics.requestUrl}</div>
               
               {diagnostics.errorMessage && (
                 <>
