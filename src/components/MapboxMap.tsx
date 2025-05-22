@@ -29,6 +29,7 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
   const [roadLayers, setRoadLayers] = useState<string[]>([]);
   const [currentGeoJSON, setCurrentGeoJSON] = useState<any>(geoJSONData);
   const [currentToken, setCurrentToken] = useState<string>(apiKey || 'pk.eyJ1IjoidGdlcnRpbiIsImEiOiJYTW5sTVhRIn0.X4B5APkxkWVaiSg3KqMCaQ');
+  const [allCongestedRoads, setAllCongestedRoads] = useState<RoadSegment[]>([]);
   
   const validateMapboxToken = (token: string) => {
     const tokenParts = token.split('.');
@@ -517,7 +518,12 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
       type: 'FeatureCollection',
       features: roads.map(road => {
         // Get color based on congestion level
-        const color = getCongestionColor(road.congestionLevel);
+        let color = getCongestionColor(road.congestionLevel);
+        
+        // If there's a selected road, make non-selected roads appear muted
+        if (selectedRoad && selectedRoad.id !== road.id) {
+          color = getCongestionColor(road.congestionLevel, true); // Pass true for muted version
+        }
         
         // Check if coordinates are valid
         if (!road.coordinates || road.coordinates.length < 2) {
@@ -534,7 +540,8 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
             length: road.length,
             color,
             hexagonId: road.hexagonId,
-            roadData: JSON.stringify(road) // Store the full road object for later
+            roadData: JSON.stringify(road), // Store the full road object for later
+            isSelected: selectedRoad && selectedRoad.id === road.id
           },
           geometry: {
             type: 'LineString',
@@ -546,10 +553,20 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
   };
   
   // Function to get color based on congestion level
-  const getCongestionColor = (level: number): string => {
-    if (level < 0.3) return '#22c55e'; // Green
-    if (level < 0.6) return '#f59e0b'; // Yellow/Amber
-    return '#ef4444'; // Red
+  // Added muted parameter to create muted colors for non-selected roads
+  const getCongestionColor = (level: number, muted: boolean = false): string => {
+    let baseColor;
+    
+    if (level < 0.3) baseColor = '#22c55e'; // Green
+    else if (level < 0.6) baseColor = '#f59e0b'; // Yellow/Amber
+    else baseColor = '#ef4444'; // Red
+    
+    // If muted, create a more transparent version of the color
+    if (muted) {
+      return baseColor + '99'; // Add 60% opacity
+    }
+    
+    return baseColor;
   };
   
   // Function to render congested roads on the map
@@ -557,6 +574,9 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
     if (!map.current || !map.current.isStyleLoaded()) return;
     
     try {
+      // Store all roads for later use when focusing on a specific road
+      setAllCongestedRoads(roads);
+      
       const geojson = roadSegmentsToGeoJSON(roads);
       
       console.log(`Rendering ${roads.length} roads with detailed geometry`);
@@ -569,6 +589,21 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
       roadLayers.forEach(layerId => {
         map.current!.setLayoutProperty(layerId, 'visibility', 'visible');
       });
+      
+      // Update the road styling to highlight selected roads (if any)
+      map.current.setPaintProperty('roads-line', 'line-width', [
+        'case',
+        ['boolean', ['get', 'isSelected'], false],
+        8, // Selected road width
+        6  // Regular road width
+      ]);
+      
+      map.current.setPaintProperty('roads-outline', 'line-width', [
+        'case',
+        ['boolean', ['get', 'isSelected'], false],
+        12, // Selected road outline width
+        8   // Regular road outline width
+      ]);
       
       // Set the line opacity for roads-highlight to enable hovering
       map.current.setPaintProperty('roads-highlight', 'line-opacity', 0.01);
@@ -603,21 +638,51 @@ const MapboxMap: React.FC<MapboxMapProps> = ({ apiKey, geoJSONData, onMapInit })
     if (!map.current || !map.current.isStyleLoaded()) return;
     
     try {
-      // Convert to GeoJSON and render just this road
-      const geojson = roadSegmentsToGeoJSON([road]);
-      
-      if (map.current.getSource('congested-roads')) {
-        (map.current.getSource('congested-roads') as mapboxgl.GeoJSONSource).setData(geojson);
+      // Use all roads but highlight the selected one
+      if (allCongestedRoads.length > 0) {
+        // Convert to GeoJSON and render all roads, but with selected state
+        const geojson = roadSegmentsToGeoJSON(allCongestedRoads);
+        
+        if (map.current.getSource('congested-roads')) {
+          (map.current.getSource('congested-roads') as mapboxgl.GeoJSONSource).setData(geojson);
+        }
+        
+        // Make road layers visible
+        roadLayers.forEach(layerId => {
+          map.current!.setLayoutProperty(layerId, 'visibility', 'visible');
+        });
+        
+        // Update the road styling to highlight selected roads
+        map.current.setPaintProperty('roads-line', 'line-width', [
+          'case',
+          ['boolean', ['get', 'isSelected'], false],
+          8, // Selected road width
+          6  // Regular road width
+        ]);
+        
+        map.current.setPaintProperty('roads-outline', 'line-width', [
+          'case',
+          ['boolean', ['get', 'isSelected'], false],
+          12, // Selected road outline width
+          8   // Regular road outline width
+        ]);
+        
+        console.log(`Focused on road: "${road.name}" while keeping all ${allCongestedRoads.length} roads visible`);
+      } else {
+        // Fallback to old behavior if there are no stored roads
+        const geojson = roadSegmentsToGeoJSON([road]);
+        
+        if (map.current.getSource('congested-roads')) {
+          (map.current.getSource('congested-roads') as mapboxgl.GeoJSONSource).setData(geojson);
+        }
+        
+        // Make road layers visible
+        roadLayers.forEach(layerId => {
+          map.current!.setLayoutProperty(layerId, 'visibility', 'visible');
+        });
+        
+        console.log(`Focused on road: "${road.name}" (fallback mode)`);
       }
-      
-      // Make road layers visible
-      roadLayers.forEach(layerId => {
-        map.current!.setLayoutProperty(layerId, 'visibility', 'visible');
-      });
-      
-      // Highlight this road
-      map.current.setPaintProperty('roads-line', 'line-width', 8);
-      map.current.setPaintProperty('roads-outline', 'line-width', 12);
       
     } catch (error) {
       console.error('Error rendering selected road:', error);

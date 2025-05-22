@@ -101,10 +101,9 @@ const Index = () => {
     // Highlight the road (if the map component has a setSelectedRoad method)
     if (mapRef.setSelectedRoad) {
       mapRef.setSelectedRoad(road);
+      // Don't close the dialog so user can select other roads
+      // setShowCongestedRoads(false); - Removed to keep dialog open
     }
-    
-    // Close congested roads dialog
-    setShowCongestedRoads(false);
   };
 
   // Analyze roads in the current map view
