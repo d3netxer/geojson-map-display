@@ -1,3 +1,4 @@
+
 import { processGeoJSON } from '@/lib/mapUtils';
 import { MapStats } from './types';
 import GeoJSONLayer from '@arcgis/core/layers/GeoJSONLayer';
@@ -99,15 +100,15 @@ export const createGeoJSONLayer = (
             size: baseHeight,
             material: { 
               color: colors[0],
-              // Adjust material transparency
-              transparency: 20  // 30% transparent
+              // Increase material transparency from 80 to 40 (60% transparent)
+              transparency: 40  // 60% transparent 
             }
           }
         ]
       },
       visualVariables: visualVariables
     } as any,
-    opacity: 0.8, // Reduced opacity to better blend with the map
+    opacity: 0.6, // Reduced opacity from 0.8 to 0.6 for increased transparency
     popupEnabled: false,
     outFields: ["*"]
   });
@@ -194,7 +195,7 @@ export const updateLayerVisualization = (
               size: baseHeight,
               material: { 
                 color: colors[0],
-                transparency: 20 // 30% transparent (transparency is 0-100)
+                transparency: 40 // Increased transparency from 80 to 40 (60% transparent)
               }
             }
           ]
@@ -213,8 +214,8 @@ export const updateLayerVisualization = (
       console.error("Error updating symbol material:", err);
     }
     
-    // Update the layer's opacity
-    layer.opacity = 0.99;
+    // Update the layer's opacity - reduced from 0.99 to 0.6
+    layer.opacity = 0.6;
     
     // Refresh the layer
     layer.refresh();
@@ -222,3 +223,4 @@ export const updateLayerVisualization = (
     console.error("Error in updateLayerVisualization:", err);
   }
 };
+
