@@ -1,150 +1,220 @@
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
-@import 'mapbox-gl/dist/mapbox-gl.css';
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 210 33% 98%;
-    --foreground: 222 47% 11%;
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 240 10% 3.9%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 240 10% 3.9%;
 
-    --primary: 210 100% 50%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 240 5.9% 10%;
+    --primary-foreground: 0 0% 98%;
 
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
 
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
 
-    --accent: 210 40% 96%;
-    --accent-foreground: 222 47% 11%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 222 84% 5%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 5.9% 10%;
 
-    --radius: 0.75rem;
-
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5% 26%;
-    --sidebar-primary: 240 6% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 5% 96%;
-    --sidebar-accent-foreground: 240 6% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217 91% 60%;
+    --radius: 0.5rem;
   }
 
   .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
 
-    --card: 222 47% 11%;
-    --card-foreground: 210 40% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
 
-    --popover: 222 47% 11%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
 
-    --primary: 210 100% 50%;
-    --primary-foreground: 222 47% 11%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 5.9% 10%;
 
-    --secondary: 217 33% 18%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
 
-    --muted: 217 33% 18%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
 
-    --accent: 217 33% 18%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
 
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 217 33% 18%;
-    --input: 217 33% 18%;
-    --ring: 213 27% 84%;
-
-    --sidebar-background: 240 6% 10%;
-    --sidebar-foreground: 240 5% 96%;
-    --sidebar-primary: 224 76% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 4% 16%;
-    --sidebar-accent-foreground: 240 5% 96%;
-    --sidebar-border: 240 4% 16%;
-    --sidebar-ring: 217 91% 60%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
   }
-}
 
-@layer base {
   * {
     @apply border-border;
   }
-
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
 
-@layer components {
-  .glass-card {
-    @apply bg-white/70 backdrop-blur-md border border-white/10 shadow-lg;
-  }
-  
-  .map-container {
-    width: 100%;
-    height: 100vh;
-  }
-  
-  .mapboxgl-popup {
-    @apply max-w-md;
-  }
-  
-  .mapboxgl-popup-content {
-    @apply glass-card p-4 rounded-xl border-0;
-  }
-  
-  .map-overlay {
-    @apply absolute top-4 left-4 z-10 glass-card p-4 rounded-xl max-w-md animate-fade-in-up;
-  }
-  
-  .map-control {
-    @apply absolute bottom-8 right-4 z-10 glass-card p-4 rounded-xl flex flex-col gap-2 animate-fade-in;
-  }
-  
-  .chip {
-    @apply inline-block px-2.5 py-1 text-xs font-medium rounded-full bg-apple-blue/10 text-apple-blue;
-  }
-  
-  .info-row {
-    @apply flex justify-between items-center py-1.5 border-b border-gray-100 last:border-0;
-  }
-  
-  .info-label {
-    @apply text-sm text-muted-foreground font-medium;
-  }
-  
-  .info-value {
-    @apply text-sm font-semibold;
-  }
-  
-  .loading-container {
-    @apply fixed inset-0 flex flex-col items-center justify-center bg-background z-50;
-  }
-  
-  .loading-spinner {
-    @apply h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent;
-  }
+/* Map Component Styles */
+.map-container {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 10;
+}
+
+.map-overlay {
+  position: absolute;
+  top: 30px;
+  left: 30px;
+  padding: 15px 20px;
+  border-radius: 0.5rem;
+  max-width: 300px;
+  z-index: 20;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.map-control {
+  position: absolute;
+  top: 30px;
+  right: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 200px;
+  z-index: 20;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.info-label {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.info-value {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.chip {
+  display: inline-block;
+  padding: 2px 8px;
+  background-color: #5755ea;
+  color: white;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.loading-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.8);
+  z-index: 30;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  border-left-color: #5755ea;
+  animation: spin 1s linear infinite;
+}
+
+.glass-card {
+  background-color: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out;
+}
+
+/* ESRI-specific styles */
+.esri-view {
+  width: 100%;
+  height: 100%;
+}
+
+.esri-ui {
+  z-index: 15; 
+}
+
+.esri-popup__main-container {
+  max-width: 350px;
+}
+
+.esri-popup__header {
+  background-color: #5755ea;
+}
+
+.esri-popup__header-title {
+  color: white;
+}
+
+.esri-view-surface--inset-outline:focus::after {
+  outline: none !important;
+}
+
+/* Enhanced label visibility */
+.esri-streets-labels {
+  font-weight: 600 !important;
+  text-shadow: 0 0 3px white, 0 0 3px white, 0 0 3px white !important;
+}
+
+/* Make sure hexagons don't obscure street labels */
+.esri-view-surface canvas {
+  mix-blend-mode: multiply;
+}
+
+/* Improve street labels visibility */
+.esri-component.esri-attribution {
+  background-color: rgba(255, 255, 255, 0.7) !important;
 }
